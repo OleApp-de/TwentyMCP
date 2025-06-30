@@ -302,12 +302,18 @@ export function createApiKeyOAuthRouter(options: OAuthRouterOptions): Router {
         }
         
         // Set a secure cookie with the session ID
-        res.cookie('mcp_session', session_id || randomUUID(), {
+        const cookieSessionId = session_id || randomUUID();
+        res.cookie('mcp_session', cookieSessionId, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
+          secure: false, // Allow http for localhost
+          sameSite: 'none', // Allow cross-site for Claude Web
           maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
+        
+        // Also store the code->session mapping for token exchange
+        if (code && cookieSessionId) {
+          provider.linkSessionToApiKey(cookieSessionId, api_key);
+        }
         
         redirectUrl.searchParams.set('code', code);
         if (state) redirectUrl.searchParams.set('state', state);
@@ -487,8 +493,8 @@ Session ID: ${session_id || 'none'}
         // Set/refresh cookie
         res.cookie('mcp_session', sessionId, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
+          secure: false, // Allow http for localhost
+          sameSite: 'none', // Allow cross-site for Claude Web
           maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
       }
