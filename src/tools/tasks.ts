@@ -134,13 +134,6 @@ export function registerTaskTools(
         const client = getClient(sessionId);
         
         logger.info(`Creating task: ${params.title}`);
-        logger.debug('Task creation params:', {
-          title: params.title,
-          linkToCompanyId: params.linkToCompanyId,
-          linkToPersonId: params.linkToPersonId,
-          hasCompanyLink: !!params.linkToCompanyId,
-          hasPersonLink: !!params.linkToPersonId
-        });
         
         const taskData: any = {
           status: params.status || 'TODO'
@@ -160,10 +153,15 @@ export function registerTaskTools(
         if (params.bodyMarkdown || params.bodyBlocknote) {
           taskData.bodyV2 = {};
           if (params.bodyMarkdown && params.bodyMarkdown.trim()) {
-            taskData.bodyV2.markdown = params.bodyMarkdown;
+            taskData.bodyV2.markdown = params.bodyMarkdown.trim();
+            // WICHTIG: API erwartet sowohl markdown als auch blocknote
+            // Wenn nur markdown gegeben ist, leeren blocknote setzen (API generiert automatisch)
+            if (!params.bodyBlocknote) {
+              taskData.bodyV2.blocknote = "";
+            }
           }
           if (params.bodyBlocknote && params.bodyBlocknote.trim()) {
-            taskData.bodyV2.blocknote = params.bodyBlocknote;
+            taskData.bodyV2.blocknote = params.bodyBlocknote.trim();
           }
           // If bodyV2 ends up empty, don't send it
           if (Object.keys(taskData.bodyV2).length === 0) {
@@ -186,73 +184,73 @@ export function registerTaskTools(
         logger.debug('Final taskData being sent to API:', taskData);
         
         const response = await client.makeRequest('POST', '/tasks', taskData);
-        
         const createdTask = response.data?.createTask;
+        
         if (!createdTask?.id) {
-          throw new Error('Failed to create task - no task ID in response');
+          throw new Error('Task creation failed - no task ID returned');
         }
-        
-        const taskId = createdTask.id;
-        const createdLinks = [];
-        
-        // Create TaskTarget links if specified (programmatic convenience)
+
+        const results: any = {
+          success: true,
+          task: createdTask,
+          message: 'Task created successfully',
+          linkedTargets: []
+        };
+
+        // Automatisches Linking mit Company falls linkToCompanyId angegeben
         if (params.linkToCompanyId) {
           try {
-            logger.info(`Attempting to link task ${taskId} to company ${params.linkToCompanyId}`);
-            const linkData = {
-              taskId: taskId,
+            logger.info(`Creating TaskTarget for task ${createdTask.id} -> company ${params.linkToCompanyId}`);
+            const targetResponse = await client.makeRequest('POST', '/taskTargets', {
+              taskId: createdTask.id,
               companyId: params.linkToCompanyId
-            };
-            logger.debug('TaskTarget linkData:', linkData);
-            const linkResponse = await client.makeRequest('POST', '/taskTargets', linkData);
-            logger.debug('TaskTarget response:', linkResponse);
-            createdLinks.push(`Linked to company ${params.linkToCompanyId}`);
-            logger.info(`Task ${taskId} successfully linked to company ${params.linkToCompanyId}`);
-          } catch (linkError) {
-            logger.error('Error linking task to company:', {
-              error: linkError,
-              taskId,
-              companyId: params.linkToCompanyId,
-              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
             });
-            createdLinks.push(`Failed to link to company: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
+            results.linkedTargets.push({
+              type: 'company',
+              targetId: params.linkToCompanyId,
+              taskTarget: targetResponse.data?.createTaskTarget || null
+            });
+            logger.info(`TaskTarget created successfully: task -> company`);
+          } catch (linkError) {
+            logger.error(`Failed to link task to company ${params.linkToCompanyId}:`, linkError);
+            results.linkingErrors = results.linkingErrors || [];
+            results.linkingErrors.push({
+              type: 'company',
+              targetId: params.linkToCompanyId,
+              error: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
           }
         }
-        
+
+        // Automatisches Linking mit Person falls linkToPersonId angegeben
         if (params.linkToPersonId) {
           try {
-            logger.info(`Attempting to link task ${taskId} to person ${params.linkToPersonId}`);
-            const linkData = {
-              taskId: taskId,
+            logger.info(`Creating TaskTarget for task ${createdTask.id} -> person ${params.linkToPersonId}`);
+            const targetResponse = await client.makeRequest('POST', '/taskTargets', {
+              taskId: createdTask.id,
               personId: params.linkToPersonId
-            };
-            logger.debug('TaskTarget linkData:', linkData);
-            const linkResponse = await client.makeRequest('POST', '/taskTargets', linkData);
-            logger.debug('TaskTarget response:', linkResponse);
-            createdLinks.push(`Linked to person ${params.linkToPersonId}`);
-            logger.info(`Task ${taskId} successfully linked to person ${params.linkToPersonId}`);
-          } catch (linkError) {
-            logger.error('Error linking task to person:', {
-              error: linkError,
-              taskId,
-              personId: params.linkToPersonId,
-              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
             });
-            createdLinks.push(`Failed to link to person: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
+            results.linkedTargets.push({
+              type: 'person',
+              targetId: params.linkToPersonId,
+              taskTarget: targetResponse.data?.createTaskTarget || null
+            });
+            logger.info(`TaskTarget created successfully: task -> person`);
+          } catch (linkError) {
+            logger.error(`Failed to link task to person ${params.linkToPersonId}:`, linkError);
+            results.linkingErrors = results.linkingErrors || [];
+            results.linkingErrors.push({
+              type: 'person',
+              targetId: params.linkToPersonId,
+              error: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
           }
         }
-        
+
         return {
           content: [{
             type: 'text',
-            text: JSON.stringify({
-              success: true,
-              task: createdTask,
-              message: 'Task created successfully',
-              linksCreated: createdLinks,
-              linkedToCompany: !!params.linkToCompanyId,
-              linkedToPerson: !!params.linkToPersonId
-            }, null, 2)
+            text: JSON.stringify(results, null, 2)
           }]
         };
         
@@ -313,6 +311,11 @@ export function registerTaskTools(
           updateData.bodyV2 = {};
           if (params.bodyMarkdown !== undefined) {
             updateData.bodyV2.markdown = params.bodyMarkdown;
+            // WICHTIG: API erwartet sowohl markdown als auch blocknote
+            // Wenn nur markdown aktualisiert wird, leeren blocknote setzen
+            if (params.bodyBlocknote === undefined) {
+              updateData.bodyV2.blocknote = "";
+            }
           }
           if (params.bodyBlocknote !== undefined) {
             updateData.bodyV2.blocknote = params.bodyBlocknote;

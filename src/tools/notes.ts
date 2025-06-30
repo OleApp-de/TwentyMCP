@@ -131,13 +131,6 @@ export function registerNotesTools(
         const client = getClient(sessionId);
         
         logger.info(`Creating note: ${params.title}`);
-        logger.debug('Note creation params:', {
-          title: params.title,
-          linkToCompanyId: params.linkToCompanyId,
-          linkToPersonId: params.linkToPersonId,
-          hasCompanyLink: !!params.linkToCompanyId,
-          hasPersonLink: !!params.linkToPersonId
-        });
         
         const noteData: any = {};
 
@@ -155,10 +148,15 @@ export function registerNotesTools(
         if (params.bodyMarkdown || params.bodyBlocknote) {
           noteData.bodyV2 = {};
           if (params.bodyMarkdown && params.bodyMarkdown.trim()) {
-            noteData.bodyV2.markdown = params.bodyMarkdown;
+            noteData.bodyV2.markdown = params.bodyMarkdown.trim();
+            // WICHTIG: API erwartet sowohl markdown als auch blocknote
+            // Wenn nur markdown gegeben ist, leeren blocknote setzen (API generiert automatisch)
+            if (!params.bodyBlocknote) {
+              noteData.bodyV2.blocknote = "";
+            }
           }
           if (params.bodyBlocknote && params.bodyBlocknote.trim()) {
-            noteData.bodyV2.blocknote = params.bodyBlocknote;
+            noteData.bodyV2.blocknote = params.bodyBlocknote.trim();
           }
           // If bodyV2 ends up empty, don't send it
           if (Object.keys(noteData.bodyV2).length === 0) {
@@ -179,73 +177,73 @@ export function registerNotesTools(
         logger.debug('Final noteData being sent to API:', noteData);
         
         const response = await client.makeRequest('POST', '/notes', noteData);
-        
         const createdNote = response.data?.createNote;
+        
         if (!createdNote?.id) {
-          throw new Error('Failed to create note - no note ID in response');
+          throw new Error('Note creation failed - no note ID returned');
         }
-        
-        const noteId = createdNote.id;
-        const createdLinks = [];
-        
-        // Create NoteTarget links if specified (programmatic convenience)
+
+        const results: any = {
+          success: true,
+          note: createdNote,
+          message: 'Note created successfully',
+          linkedTargets: []
+        };
+
+        // Automatisches Linking mit Company falls linkToCompanyId angegeben
         if (params.linkToCompanyId) {
           try {
-            logger.info(`Attempting to link note ${noteId} to company ${params.linkToCompanyId}`);
-            const linkData = {
-              noteId: noteId,
+            logger.info(`Creating NoteTarget for note ${createdNote.id} -> company ${params.linkToCompanyId}`);
+            const targetResponse = await client.makeRequest('POST', '/noteTargets', {
+              noteId: createdNote.id,
               companyId: params.linkToCompanyId
-            };
-            logger.debug('NoteTarget linkData:', linkData);
-            const linkResponse = await client.makeRequest('POST', '/noteTargets', linkData);
-            logger.debug('NoteTarget response:', linkResponse);
-            createdLinks.push(`Linked to company ${params.linkToCompanyId}`);
-            logger.info(`Note ${noteId} successfully linked to company ${params.linkToCompanyId}`);
-          } catch (linkError) {
-            logger.error('Error linking note to company:', {
-              error: linkError,
-              noteId,
-              companyId: params.linkToCompanyId,
-              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
             });
-            createdLinks.push(`Failed to link to company: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
+            results.linkedTargets.push({
+              type: 'company',
+              targetId: params.linkToCompanyId,
+              noteTarget: targetResponse.data?.createNoteTarget || null
+            });
+            logger.info(`NoteTarget created successfully: note -> company`);
+          } catch (linkError) {
+            logger.error(`Failed to link note to company ${params.linkToCompanyId}:`, linkError);
+            results.linkingErrors = results.linkingErrors || [];
+            results.linkingErrors.push({
+              type: 'company',
+              targetId: params.linkToCompanyId,
+              error: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
           }
         }
-        
+
+        // Automatisches Linking mit Person falls linkToPersonId angegeben
         if (params.linkToPersonId) {
           try {
-            logger.info(`Attempting to link note ${noteId} to person ${params.linkToPersonId}`);
-            const linkData = {
-              noteId: noteId,
+            logger.info(`Creating NoteTarget for note ${createdNote.id} -> person ${params.linkToPersonId}`);
+            const targetResponse = await client.makeRequest('POST', '/noteTargets', {
+              noteId: createdNote.id,
               personId: params.linkToPersonId
-            };
-            logger.debug('NoteTarget linkData:', linkData);
-            const linkResponse = await client.makeRequest('POST', '/noteTargets', linkData);
-            logger.debug('NoteTarget response:', linkResponse);
-            createdLinks.push(`Linked to person ${params.linkToPersonId}`);
-            logger.info(`Note ${noteId} successfully linked to person ${params.linkToPersonId}`);
-          } catch (linkError) {
-            logger.error('Error linking note to person:', {
-              error: linkError,
-              noteId,
-              personId: params.linkToPersonId,
-              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
             });
-            createdLinks.push(`Failed to link to person: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
+            results.linkedTargets.push({
+              type: 'person',
+              targetId: params.linkToPersonId,
+              noteTarget: targetResponse.data?.createNoteTarget || null
+            });
+            logger.info(`NoteTarget created successfully: note -> person`);
+          } catch (linkError) {
+            logger.error(`Failed to link note to person ${params.linkToPersonId}:`, linkError);
+            results.linkingErrors = results.linkingErrors || [];
+            results.linkingErrors.push({
+              type: 'person',
+              targetId: params.linkToPersonId,
+              error: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
           }
         }
-        
+
         return {
           content: [{
             type: 'text',
-            text: JSON.stringify({
-              success: true,
-              note: createdNote,
-              message: 'Note created successfully',
-              linksCreated: createdLinks,
-              linkedToCompany: !!params.linkToCompanyId,
-              linkedToPerson: !!params.linkToPersonId
-            }, null, 2)
+            text: JSON.stringify(results, null, 2)
           }]
         };
         
@@ -300,6 +298,11 @@ export function registerNotesTools(
           updateData.bodyV2 = {};
           if (params.bodyMarkdown !== undefined) {
             updateData.bodyV2.markdown = params.bodyMarkdown;
+            // WICHTIG: API erwartet sowohl markdown als auch blocknote
+            // Wenn nur markdown aktualisiert wird, leeren blocknote setzen
+            if (params.bodyBlocknote === undefined) {
+              updateData.bodyV2.blocknote = "";
+            }
           }
           if (params.bodyBlocknote !== undefined) {
             updateData.bodyV2.blocknote = params.bodyBlocknote;
@@ -407,7 +410,10 @@ export function registerNotesTools(
           
           if (note.body) noteData.body = note.body;
           if (note.bodyMarkdown) {
-            noteData.bodyV2 = { markdown: note.bodyMarkdown };
+            noteData.bodyV2 = { 
+              markdown: note.bodyMarkdown,
+              blocknote: "" // API benötigt beide Felder
+            };
           }
           if (note.position !== undefined) noteData.position = note.position;
           
