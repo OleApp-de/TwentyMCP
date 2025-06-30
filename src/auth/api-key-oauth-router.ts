@@ -35,12 +35,15 @@ export function createApiKeyOAuthRouter(options: OAuthRouterOptions): Router {
       issuer: issuerUrl.toString(),
       authorization_endpoint: new URL('/oauth/authorize', baseUrl).toString(),
       token_endpoint: new URL('/oauth/token', baseUrl).toString(),
-      registration_endpoint: new URL('/oauth/register', baseUrl).toString(), // Dynamic Client Registration!
+      registration_endpoint: new URL('/oauth/register', baseUrl).toString(),
       token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
       response_types_supported: ['code', 'token'],
       grant_types_supported: ['authorization_code', 'api_key', 'refresh_token'],
       scopes_supported: ['read', 'write'],
       code_challenge_methods_supported: ['S256'],
+      // Streamable HTTP support signals
+      dpop_signing_alg_values_supported: ['RS256', 'ES256'],
+      tls_client_certificate_bound_access_tokens: false,
       // Custom extensions
       api_key_endpoint: new URL('/oauth/api-key', baseUrl).toString(),
       service_documentation: serviceDocumentationUrl?.toString()

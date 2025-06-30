@@ -45,5 +45,5 @@ EXPOSE 3000
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the server with SSE transport (better for Claude)
-CMD ["node", "dist/index.js", "sse"] 
+# Start the server with streamable-http transport (required for Claude Web)
+CMD ["node", "dist/index.js", "streamable-http"] 

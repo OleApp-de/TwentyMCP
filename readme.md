@@ -1,205 +1,113 @@
 # Twenty CRM MCP Server
 
-Ein Model Context Protocol (MCP) Server für Twenty CRM, der es ermöglicht, mit Twenty CRM über Chat-Tools wie Claude zu interagieren.
+A Model Context Protocol (MCP) server that provides tools for interacting with Twenty CRM.
 
 ## Features
 
-- **Multi-Transport Support**: Unterstützt stdio, SSE und Streamable HTTP Transport
-- **Vollständige Twenty CRM Integration**: Zugriff auf People, Companies, Tasks, Notes und Opportunities
-- **Session Management**: Unterstützt mehrere Benutzer mit eigenen API-Keys
-- **Umfassende Tools**: CRUD-Operationen für alle Hauptentitäten
-- **Suchfunktionen**: Erweiterte Filter- und Suchoptionen
-- **Pipeline Analytics**: Zusammenfassungen und Berichte
+- **OAuth 2.1 Support**: Full OAuth authentication for Claude Web compatibility
+- **Dual Authentication**: Supports both API keys (Claude Desktop) and OAuth (Claude Web)
+- **Streamable HTTP**: Modern transport protocol with SSE fallback
+- **Multiple Tools**: People, Companies, Tasks, Notes, and Opportunities management
+- **Session Management**: Secure session handling for multi-user environments
 
-## Installation
+## Quick Start
 
-```bash
-# Repository klonen
-git clone <repository-url>
-cd twenty-crm-mcp-server
+### Claude Web (OAuth)
 
-# Dependencies installieren
-npm install
-
-# Umgebungsvariablen konfigurieren
-cp .env.example .env
-# .env bearbeiten und TWENTY_CRM_URL anpassen
-
-# TypeScript kompilieren
-npm run build
-```
-
-## Verwendung
-
-### 1. STDIO Transport (für Claude Desktop)
-
-```bash
-# Development
-npm run dev
-
-# Production
-npm start
-```
-
-Für Claude Desktop, füge folgende Konfiguration zu deiner MCP-Konfiguration hinzu:
+Add to your Claude Web configuration:
 
 ```json
 {
   "mcpServers": {
     "twenty-crm": {
-      "command": "node",
-      "args": ["path/to/twenty-crm-mcp-server/dist/index.js", "stdio"]
+      "url": "https://twenty.mcp.ole.de/mcp"
     }
   }
 }
 ```
 
-### 2. SSE Transport (Legacy, für ältere Clients)
+### Claude Desktop (API Key)
 
+1. Clone this repository
+2. Install dependencies: `npm install`
+3. Add to Claude Desktop config:
+
+```json
+{
+  "twenty-crm": {
+    "command": "node",
+    "args": ["/path/to/twenty-mcp/dist/index.js", "stdio"],
+    "env": {
+      "TWENTY_API_KEY": "your-api-key-here"
+    }
+  }
+}
+```
+
+## Available Tools
+
+- **authenticate**: Set API key for Twenty CRM authentication
+- **list_people**: List all people/contacts
+- **create_person**: Create a new person
+- **update_person**: Update person details
+- **delete_person**: Delete a person
+- **list_companies**: List all companies
+- **create_company**: Create a new company
+- **update_company**: Update company details
+- **delete_company**: Delete a company
+- **list_tasks**: List all tasks
+- **create_task**: Create a new task
+- **update_task**: Update task details
+- **delete_task**: Delete a task
+- **list_notes**: List all notes
+- **create_note**: Create a new note
+- **update_note**: Update note details
+- **delete_note**: Delete a note
+- **list_opportunities**: List all opportunities
+- **create_opportunity**: Create a new opportunity
+- **update_opportunity**: Update opportunity details
+- **delete_opportunity**: Delete an opportunity
+
+## Authentication
+
+### OAuth Flow (Claude Web)
+1. Connect to the server URL
+2. You'll be redirected to authorize
+3. Enter your Twenty CRM API key
+4. Grant access to Claude
+
+### Direct API Key (Claude Desktop)
+Use the `authenticate` tool with your API key:
+```
+authenticate({ apiKey: "your-twenty-crm-api-key" })
+```
+
+## Development
+
+### Local Development
 ```bash
-npm run dev sse
-# Server läuft auf http://localhost:3000
+npm install
+npm run dev
 ```
 
-Endpoints:
-- SSE Stream: `GET http://localhost:3000/sse`
-- Messages: `POST http://localhost:3000/messages?sessionId=<id>`
-
-### 3. Streamable HTTP Transport (Empfohlen für Web)
-
+### Building
 ```bash
-npm run dev streamable-http
-# Server läuft auf http://localhost:3000
+npm run build
 ```
 
-Endpoint:
-- `POST/GET/DELETE http://localhost:3000/mcp`
-
-## Authentifizierung
-
-### Methode 1: Umgebungsvariable (für stdio)
-
-Setze `TWENTY_API_KEY` in der `.env` Datei:
-
-```env
-TWENTY_API_KEY=your-bearer-token-here
+### Docker
+```bash
+docker build -t twenty-mcp .
+docker run -p 3000:3000 twenty-mcp
 ```
 
-### Methode 2: Authenticate Tool (empfohlen)
+## Environment Variables
 
-Verwende das `authenticate` Tool nach der Verbindung:
+- `PORT`: Server port (default: 3000)
+- `BASE_URL`: Base URL for OAuth callbacks
+- `SESSION_SECRET`: Secret for session encryption
+- `LOG_LEVEL`: Logging level (default: info)
 
-```
-authenticate mit API Key: <dein-twenty-api-key>
-```
-
-## Verfügbare Tools
-
-### People Management
-- `list-people` - Personen auflisten und suchen
-- `get-person` - Details einer Person abrufen
-- `create-person` - Neue Person erstellen
-- `update-person` - Person aktualisieren
-- `delete-person` - Person löschen
-
-### Company Management
-- `list-companies` - Unternehmen auflisten und suchen
-- `get-company` - Details eines Unternehmens abrufen
-- `create-company` - Neues Unternehmen erstellen
-- `update-company` - Unternehmen aktualisieren
-- `delete-company` - Unternehmen löschen
-
-### Task Management
-- `list-tasks` - Aufgaben auflisten und filtern
-- `get-task` - Details einer Aufgabe abrufen
-- `create-task` - Neue Aufgabe erstellen
-- `update-task` - Aufgabe aktualisieren
-- `delete-task` - Aufgabe löschen
-- `complete-task` - Aufgabe als erledigt markieren
-
-### Notes
-- `list-notes` - Notizen auflisten und suchen
-- `create-note` - Neue Notiz erstellen
-
-### Opportunities
-- `list-opportunities` - Verkaufschancen auflisten
-- `create-opportunity` - Neue Verkaufschance erstellen
-- `get-pipeline-summary` - Pipeline-Übersicht abrufen
-
-### System
-- `get-server-info` - Server-Informationen abrufen
-- `authenticate` - API-Key setzen
-
-## Beispiele
-
-### Personen suchen
-```
-Verwende list-people mit search: "Schmidt"
-```
-
-### Neue Aufgabe erstellen
-```
-Verwende create-task mit:
-- title: "Follow-up mit Kunde"
-- body: "Angebot nachfassen"
-- dueAt: "2024-12-20T10:00:00Z"
-- status: "TODO"
-```
-
-### Pipeline-Übersicht
-```
-Verwende get-pipeline-summary
-```
-
-## Entwicklung
-
-### Projekt-Struktur
-```
-twenty-crm-mcp-server/
-├── src/
-│   ├── index.ts          # Hauptserver mit Transport-Handling
-│   ├── twenty-client.ts  # Twenty CRM API Client
-│   └── tools/           # Tool-Implementierungen
-│       ├── people.ts
-│       ├── companies.ts
-│       ├── tasks.ts
-│       ├── notes.ts
-│       └── opportunities.ts
-├── package.json
-├── tsconfig.json
-├── .env.example
-└── README.md
-```
-
-### Logging
-
-Das Log-Level kann über die Umgebungsvariable `LOG_LEVEL` gesteuert werden:
-- `error`: Nur Fehler
-- `warn`: Warnungen und Fehler
-- `info`: Allgemeine Informationen (Standard)
-- `debug`: Detaillierte Debug-Informationen
-
-## Troubleshooting
-
-### Authentication Fehler
-- Stelle sicher, dass dein API-Key das Bearer-Token-Format hat
-- Überprüfe die Twenty CRM URL in der .env Datei
-- Verwende das `authenticate` Tool zur Laufzeit
-
-### Connection Issues
-- Für SSE: Stelle sicher, dass der Server auf dem richtigen Port läuft
-- Für stdio: Überprüfe die Pfade in der MCP-Konfiguration
-- Aktiviere Debug-Logging für mehr Details
-
-### API Limits
-- Twenty CRM limitiert Abfragen auf maximal 60 Einträge
-- Verwende Pagination mit `startingAfter` und `endingBefore`
-- Nutze Filter für gezielte Abfragen
-
-## Lizenz
+## License
 
 MIT
-
-## Support
-
-Bei Fragen oder Problemen erstelle ein Issue im Repository oder kontaktiere den Support.

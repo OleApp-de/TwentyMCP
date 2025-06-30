@@ -230,7 +230,6 @@ async function main() {
             'user-agent': req.headers['user-agent']
           });
           
-          // Check Bearer token authentication first (works independently of sessions)
           if (authHeader?.startsWith('Bearer ')) {
             try {
               const token = authHeader.substring(7);
@@ -241,15 +240,15 @@ async function main() {
                 const tokenInfo = await oauthProvider.verifyAccessToken(token);
                 defaultClient = new TwentyCRMClient(tokenInfo.twentyApiKey, logger);
                 await defaultClient.testConnection(); // Verify it works
+                logger.info(`OAuth authentication successful`);
                 authenticated = true;
-                logger.info(`OAuth authentication successful for session: ${sessionId}`);
               } catch (oauthError) {
                 // If OAuth fails, try direct API key
                 logger.debug('OAuth token validation failed, trying direct API key...');
                 defaultClient = new TwentyCRMClient(token, logger);
                 await defaultClient.testConnection(); // Verify it works
+                logger.info(`Direct API key authentication successful`);
                 authenticated = true;
-                logger.info(`Direct API key authentication successful for session: ${sessionId}`);
               }
             } catch (error) {
               logger.warn('Bearer token authentication failed:', error);
