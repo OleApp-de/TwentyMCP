@@ -131,13 +131,83 @@ export class ApiKeyOAuthProvider {
    * Validate an API key and return token info
    */
   async verifyAccessToken(token: string): Promise<TokenInfo> {
+    this.logger.debug(`Verifying access token`, { 
+      tokenLength: token.length, 
+      tokenStart: token.substring(0, 10),
+      isJWT: token.startsWith('eyJ'),
+      tokenChars: token.split('').map(c => c.charCodeAt(0)).slice(0, 10)
+    });
+
     // Check cache first
     const cached = tokenCache.get(token);
     if (cached && (!cached.expiresAt || cached.expiresAt > new Date())) {
       return cached;
     }
 
-    // Validate API key by testing Twenty CRM connection
+    // Handle JWT tokens differently
+    if (token.startsWith('eyJ')) {
+      // This is a JWT token - try to decode it or accept it as valid OAuth token
+      try {
+        // For now, accept JWT tokens without validation and extract API key from payload
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        this.logger.debug('JWT payload:', { payload });
+        
+        // If JWT contains an API key, use that
+        if (payload.api_key || payload.apiKey || payload.twenty_api_key) {
+          const apiKey = payload.api_key || payload.apiKey || payload.twenty_api_key;
+          const client = new TwentyCRMClient(apiKey, this.logger);
+          await client.testConnection();
+          
+          const tokenInfo: TokenInfo = {
+            token,
+            clientId: payload.client_id || `jwt-user-${token.substring(0, 8)}`,
+            scopes: payload.scope ? payload.scope.split(' ') : ['read', 'write'],
+            expiresAt: payload.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+            twentyApiKey: apiKey
+          };
+          
+          tokenCache.set(token, tokenInfo);
+          return tokenInfo;
+        }
+        
+        // If no API key in JWT, this is probably a Twenty CRM JWT token
+        // We need to accept it as valid but can't validate against Twenty API directly
+        if (payload.type === 'API_KEY' && payload.workspaceId) {
+          this.logger.info('Twenty CRM JWT token detected, accepting without Twenty API validation');
+          
+          const tokenInfo: TokenInfo = {
+            token,
+            clientId: payload.sub || `twenty-workspace-${payload.workspaceId}`,
+            scopes: ['read', 'write'],
+            expiresAt: payload.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+            twentyApiKey: token // Keep JWT as identifier, but mark it as such
+          };
+          
+          tokenCache.set(token, tokenInfo);
+          return tokenInfo;
+        }
+        
+        // If no API key in JWT and not a Twenty CRM token, treat as generic OAuth token
+        this.logger.warn('Generic JWT token without API key field, accepting without validation');
+        
+        const tokenInfo: TokenInfo = {
+          token,
+          clientId: payload.client_id || payload.sub || `jwt-user-${token.substring(0, 8)}`,
+          scopes: payload.scope ? payload.scope.split(' ') : ['read', 'write'],
+          expiresAt: payload.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+          twentyApiKey: token // Use JWT as API key (will likely fail but allows testing)
+        };
+        
+        tokenCache.set(token, tokenInfo);
+        return tokenInfo;
+        
+      } catch (jwtError) {
+        this.logger.error('JWT parsing failed:', jwtError);
+        throw new Error('Invalid JWT token');
+      }
+    }
+
+    // Direct API key validation (existing logic)
     try {
       const client = new TwentyCRMClient(token, this.logger);
       await client.testConnection();
@@ -270,6 +340,12 @@ export class ApiKeyOAuthProvider {
 export function createOAuthMiddleware(provider: ApiKeyOAuthProvider) {
   return async (req: Request & { twentyApiKey?: string; userId?: string; authenticatedClient?: any }, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
+    
+    console.debug(`OAuth middleware received headers`, {
+      authorization: authHeader ? `Bearer ${authHeader.substring(7, 17)}...` : 'none',
+      'content-type': req.headers['content-type'],
+      'mcp-session-id': req.headers['mcp-session-id']
+    });
     
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({

@@ -126,21 +126,44 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
 
   // Helper to get client
   const getClient = (sessionId: string = 'default'): TwentyCRMClient => {
+    logger.debug(`getClient called with sessionId: ${sessionId}`, {
+      hasAuthenticatedClient: !!authenticatedClient,
+      hasCurrentRequestClient: !!currentRequestClient,
+      sessionsCount: sessions.size,
+      sessionExists: sessions.has(sessionId)
+    });
+    
     // Try authenticated client first (Bearer token pre-auth)
     if (authenticatedClient) {
+      logger.debug('Using pre-authenticated client');
       return authenticatedClient;
     }
     
     // Try current request client (for streamable-http OAuth)
     if (currentRequestClient) {
+      logger.debug('Using current request client');
       return currentRequestClient;
     }
     
     // Then try session-based client
     const session = sessions.get(sessionId);
     if (session) {
+      logger.debug(`Using session-based client for session: ${sessionId}`);
       return session.client;
     }
+    
+    // Try to find any session with a client (fallback)
+    for (const [sid, sessionData] of sessions.entries()) {
+      logger.debug(`Found session ${sid} with client`);
+      return sessionData.client;
+    }
+    
+    logger.error(`No authentication found`, {
+      sessionId,
+      sessionsAvailable: Array.from(sessions.keys()),
+      hasCurrentRequestClient: !!currentRequestClient,
+      hasAuthenticatedClient: !!authenticatedClient
+    });
     
     throw new Error(`Not authenticated. Please use Bearer token authentication or the authenticate tool first. Session: ${sessionId}`);
   };

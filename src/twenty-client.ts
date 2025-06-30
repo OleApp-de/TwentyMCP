@@ -122,8 +122,19 @@ export class TwentyCRMClient {
   constructor(apiKey: string, logger: Logger) {
     this.logger = logger;
     
-    // Remove 'Bearer ' prefix if present
-    const token = apiKey.startsWith('Bearer ') ? apiKey.substring(7) : apiKey;
+    // Remove 'Bearer ' prefix if present and clean the token
+    let token = apiKey.startsWith('Bearer ') ? apiKey.substring(7) : apiKey;
+    
+    // Clean token: remove any newlines, carriage returns, or extra whitespace
+    token = token.replace(/[\r\n\s]/g, '');
+    
+    // Log token info for debugging
+    this.logger.debug('TwentyCRMClient token info:', {
+      originalLength: apiKey.length,
+      cleanedLength: token.length,
+      isJWT: token.startsWith('eyJ'),
+      tokenStart: token.substring(0, 10)
+    });
     
     this.client = axios.create({
       baseURL: process.env.TWENTY_CRM_URL || 'https://crm.tools.ole.de/rest',
