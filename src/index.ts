@@ -1,14 +1,15 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 import winston from 'winston';
-import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
+
 import { TwentyCRMClient } from './twenty-client.js';
 import { registerPeopleTools } from './tools/people.js';
 import { registerCompanyTools } from './tools/companies.js';
@@ -25,7 +26,6 @@ type TransportType = 'stdio' | 'sse' | 'streamable-http';
 
 // Determine transport from CLI args
 const transport: TransportType = (process.argv[2] as TransportType) || 'stdio';
-const sessions = new Map<string, Session>();
 
 // Logger setup - nur für HTTP-Modi, nicht für stdio
 const logger = winston.createLogger({
@@ -38,27 +38,26 @@ const logger = winston.createLogger({
   transports: transport === 'stdio' ? [] : [
     new winston.transports.Console({
       format: winston.format.simple(),
-      stderrLevels: ['error', 'warn', 'info', 'debug'] // Alles auf stderr
+      stderrLevels: ['error', 'warn', 'info', 'debug']
     })
   ]
 });
 
-// Session management
-interface Session {
-  apiKey: string;
-  userId?: string;
-  client: TwentyCRMClient;
-}
+// Session management for per-session authentication
+const sessions = new Map<string, { apiKey: string; client: TwentyCRMClient; userId?: string }>();
 
-// Global authenticated clients - nicht session-basiert für Bearer tokens
-const authenticatedClients = new Map<string, TwentyCRMClient>();
+// Global authenticated client for Bearer token auth
+let globalAuthenticatedClient: TwentyCRMClient | null = null;
+
+// Request-scoped authentication for streamable-http
+let currentRequestClient: TwentyCRMClient | null = null;
 
 // Create and configure MCP server
-function createMcpServer(defaultClient?: TwentyCRMClient): McpServer {
+const createServer = (authenticatedClient?: TwentyCRMClient) => {
   const server = new McpServer({
     name: 'twenty-crm-mcp',
     version: '1.0.0'
-  });
+  }, { capabilities: { logging: {} } });
 
   // Register server info tool
   server.registerTool(
@@ -78,33 +77,31 @@ function createMcpServer(defaultClient?: TwentyCRMClient): McpServer {
           multiUser: true,
           requiresAuthentication: true,
           authMethods: ['api-key-tool', 'oauth-bearer'],
-          oauthEnabled: true,
-          endpoints: {
+          oauthEnabled: transport !== 'stdio',
+          endpoints: transport !== 'stdio' ? {
             oauth_metadata: '/.well-known/oauth-protected-resource',
             oauth_register: '/oauth/register',
             oauth_authorize: '/oauth/authorize',
             oauth_token: '/oauth/token'
-          }
+          } : null
         }, null, 2)
       }]
     })
   );
 
-  // Register authentication tool (REQUIRED for multi-user)
+  // Register authentication tool (REQUIRED for multi-user when no global auth)
   server.registerTool(
     'authenticate',
     {
-      description: 'Set API key for Twenty CRM authentication (REQUIRED for each user session)',
+      description: 'Set API key for Twenty CRM authentication (REQUIRED for each user session unless using Bearer token)',
       inputSchema: {
         apiKey: z.string().describe('Twenty CRM API key (Bearer token)')
       }
     },
     async ({ apiKey }, extra) => {
-      // Use request ID or generate session ID for multi-user
       const sessionId = String(extra?.requestId || 'default');
       const client = new TwentyCRMClient(apiKey, logger);
       
-      // Test the API key
       try {
         await client.testConnection();
         sessions.set(sessionId, { apiKey, client });
@@ -127,17 +124,22 @@ function createMcpServer(defaultClient?: TwentyCRMClient): McpServer {
     }
   );
 
-  // Helper to get client from session OR default client (for Bearer auth)
+  // Helper to get client
   const getClient = (sessionId: string = 'default'): TwentyCRMClient => {
-    // First try session-based client
+    // Try authenticated client first (Bearer token pre-auth)
+    if (authenticatedClient) {
+      return authenticatedClient;
+    }
+    
+    // Try current request client (for streamable-http OAuth)
+    if (currentRequestClient) {
+      return currentRequestClient;
+    }
+    
+    // Then try session-based client
     const session = sessions.get(sessionId);
     if (session) {
       return session.client;
-    }
-    
-    // Then try default client (for Bearer token auth)
-    if (defaultClient) {
-      return defaultClient;
     }
     
     throw new Error(`Not authenticated. Please use Bearer token authentication or the authenticate tool first. Session: ${sessionId}`);
@@ -151,7 +153,9 @@ function createMcpServer(defaultClient?: TwentyCRMClient): McpServer {
   registerOpportunityTools(server, getClient, logger);
 
   return server;
-}
+};
+
+const MCP_PORT = parseInt(process.env.PORT || '3000');
 
 // Main function based on transport
 async function main() {
@@ -159,270 +163,291 @@ async function main() {
 
   if (transport === 'stdio') {
     // STDIO transport
-    const server = createMcpServer();
+    const apiKey = process.env.TWENTY_API_KEY;
+    let authenticatedClient: TwentyCRMClient | undefined;
+    
+    if (apiKey) {
+      authenticatedClient = new TwentyCRMClient(apiKey, logger);
+      try {
+        await authenticatedClient.testConnection();
+        logger.info('Pre-authenticated with API key from environment');
+      } catch (error) {
+        logger.warn('API key from environment is invalid, will require authenticate tool');
+        authenticatedClient = undefined;
+      }
+    }
+    
+    const server = createServer(authenticatedClient);
     const transport = new StdioServerTransport();
     
     await server.connect(transport);
     logger.info('Twenty CRM MCP Server running on stdio');
     
-  } else if (transport === 'sse' || transport === 'streamable-http') {
-    // HTTP-based transports
-    const app = express();
-    app.use(express.json());
-    app.use(cookieParser(process.env.SESSION_SECRET || 'dev-secret-change-in-production'));
-    
-    // CORS configuration for production
-    const corsOptions = {
-      origin: (origin: any, callback: any) => {
-        // Allow requests with no origin (like mobile apps or curl)
-        if (!origin) return callback(null, true);
-        
-        // In production, you might want to restrict this
-        // For now, allow all origins but log them
-        logger.debug(`CORS request from origin: ${origin}`);
-        callback(null, true);
-      },
-      credentials: true,
-      methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'mcp-session-id'],
-      exposedHeaders: ['Set-Cookie']
-    };
-    
-    app.use(cors(corsOptions));
-    
-    // Initialize OAuth provider
-    const oauthProvider = new ApiKeyOAuthProvider(logger);
-    
-    // Setup OAuth routes
-    const baseUrl = new URL(process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`);
-    const oauthRouter = createApiKeyOAuthRouter({
-      provider: oauthProvider,
-      issuerUrl: baseUrl,
-      baseUrl,
-      serviceDocumentationUrl: new URL('https://docs.twenty.com/mcp')
-    });
+     } else if (transport === 'sse') {
+     // SSE transport
+     const app = express();
+     app.use(express.json());
+     app.use(cors({
+       origin: true,
+       credentials: true,
+       methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+       allowedHeaders: ['Content-Type', 'Authorization', 'mcp-session-id']
+     }));
+     
+     // Initialize OAuth provider and middleware
+     const oauthProvider = new ApiKeyOAuthProvider(logger);
+     const oauthMiddleware = createOAuthMiddleware(oauthProvider);
+     
+     // Setup OAuth routes
+     const baseUrl = new URL(process.env.BASE_URL || `http://localhost:${MCP_PORT}`);
+     const oauthRouter = createApiKeyOAuthRouter({
+       provider: oauthProvider,
+       issuerUrl: baseUrl,
+       baseUrl,
+       serviceDocumentationUrl: new URL('https://docs.twenty.com/mcp')
+     });
     app.use(oauthRouter);
-    
-    // Store SSE transports only
-    const sseTransports: Record<string, SSEServerTransport> = {};
-    
-    if (transport === 'streamable-http') {
-      // Streamable HTTP endpoint with OAuth support
-      app.all('/mcp', async (req, res) => {
-        logger.info(`Received ${req.method} request to /mcp`);
-        
-        try {
-          // Try OAuth authentication
-          const authHeader = req.headers.authorization;
-          // Try to get session ID from various sources
-          let sessionId = req.headers['mcp-session-id'] as string || 
-                        req.cookies?.mcp_session ||
-                        randomUUID();
-          let authenticated = false;
-          let defaultClient: TwentyCRMClient | undefined;
-          
-          logger.debug('MCP Request details:', {
-            method: req.method,
-            authorization: authHeader ? 'Bearer ***' : 'none',
-            'mcp-session-id': sessionId,
-            'cookie-session': req.cookies?.mcp_session || 'none',
-            'content-type': req.headers['content-type'],
-            'user-agent': req.headers['user-agent']
-          });
-          
-          if (authHeader?.startsWith('Bearer ')) {
-            try {
-              const token = authHeader.substring(7);
-              logger.debug('Validating OAuth/Bearer token...');
-              
-              // Try OAuth token first
-              try {
-                const tokenInfo = await oauthProvider.verifyAccessToken(token);
-                defaultClient = new TwentyCRMClient(tokenInfo.twentyApiKey, logger);
-                await defaultClient.testConnection(); // Verify it works
-                logger.info(`OAuth authentication successful`);
-                authenticated = true;
-              } catch (oauthError) {
-                // If OAuth fails, try direct API key
-                logger.debug('OAuth token validation failed, trying direct API key...');
-                defaultClient = new TwentyCRMClient(token, logger);
-                await defaultClient.testConnection(); // Verify it works
-                logger.info(`Direct API key authentication successful`);
-                authenticated = true;
-              }
-            } catch (error) {
-              logger.warn('Bearer token authentication failed:', error);
-              defaultClient = undefined;
-            }
-          }
-          
-          // Fall back to session-based authentication
-          if (!authenticated) {
-            const sessionApiKey = oauthProvider.getApiKeyForSession(sessionId);
-            if (sessionApiKey) {
-              logger.info('Found linked session:', sessionId);
-              if (!sessions.has(sessionId)) {
-                const client = new TwentyCRMClient(sessionApiKey, logger);
-                sessions.set(sessionId, {
-                  apiKey: sessionApiKey,
-                  userId: `session-${sessionId}`,
-                  client
-                });
-              }
-              authenticated = true;
-              
-              // Set/refresh cookie
-              res.cookie('mcp_session', sessionId, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 24 * 60 * 60 * 1000 // 24 hours
-              });
-            } else {
-              logger.debug('No authentication found for session:', sessionId);
-            }
-          }
-          
-          let transport: StreamableHTTPServerTransport;
-          let server: McpServer;
-          
-          // If not authenticated, always return 401 to trigger OAuth flow
-          if (!defaultClient) {
-            logger.info('No authentication found - returning 401 to trigger OAuth');
-            res.setHeader('WWW-Authenticate', 'Bearer realm="Twenty CRM MCP"');
-            return res.status(401).json({
-              jsonrpc: '2.0',
-              error: {
-                code: -32001,
-                message: 'Authentication required'
-              },
-              id: null
-            });
-          }
-          
-          // We have authentication - create server with authenticated client
-          server = createMcpServer(defaultClient);
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => sessionId
-          });
-          
-          await server.connect(transport);
-          await transport.handleRequest(req, res, req.body);
-        } catch (error) {
-          logger.error('Error handling MCP request:', error);
-          if (!res.headersSent) {
-            res.status(500).json({
-              jsonrpc: '2.0',
-              error: {
-                code: -32603,
-                message: 'Internal server error'
-              },
-              id: null
-            });
-          }
-        }
-      });
-      
-    } else {
-      // SSE transport (deprecated but supported for backwards compatibility)
-      app.get('/sse', async (req, res) => {
-        logger.info('Received GET request to /sse');
-        
-        // Check for Bearer token authentication
-        const authHeader = req.headers.authorization;
-        let defaultClient: TwentyCRMClient | undefined;
-        
-        if (authHeader?.startsWith('Bearer ')) {
-          try {
-            const token = authHeader.substring(7);
-            logger.debug('Validating OAuth/Bearer token for SSE...');
-            
-            // Try OAuth token first
-            try {
-              const tokenInfo = await oauthProvider.verifyAccessToken(token);
-              defaultClient = new TwentyCRMClient(tokenInfo.twentyApiKey, logger);
-              await defaultClient.testConnection(); // Verify it works
-              logger.info(`OAuth authentication successful for SSE`);
-            } catch (oauthError) {
-              // If OAuth fails, try direct API key
-              logger.debug('OAuth token validation failed, trying direct API key...');
-              defaultClient = new TwentyCRMClient(token, logger);
-              await defaultClient.testConnection(); // Verify it works
-              logger.info(`Direct API key authentication successful for SSE`);
-            }
-          } catch (error) {
-            logger.warn('Bearer token authentication failed for SSE:', error);
-            defaultClient = undefined;
-          }
-        }
-        
-        // Create server with or without defaultClient
-        const server = createMcpServer(defaultClient);
-        const transport = new SSEServerTransport('/messages', res);
-        const sessionId = transport.sessionId;
-        
-        if (sessionId) {
-          sseTransports[sessionId] = transport;
-          
-          res.on('close', () => {
-            delete sseTransports[sessionId];
-            sessions.delete(sessionId);
-          });
-        }
-        
-        await server.connect(transport);
-      });
-      
-      app.post('/messages', async (req, res) => {
-        const sessionId = req.query.sessionId as string;
-        const transport = sseTransports[sessionId];
-        
-        if (transport && transport instanceof SSEServerTransport) {
-          await transport.handlePostMessage(req, res, req.body);
-        } else {
-          res.status(400).send('No transport found for sessionId');
-        }
-      });
-    }
     
     // Health check endpoint
     app.get('/health', (req, res) => {
-      res.json({ status: 'ok', transport, sessions: sessions.size });
+      res.json({ status: 'healthy', transport: 'sse' });
     });
     
-    const PORT = process.env.PORT || 3000;
-    const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+         // SSE endpoint with OAuth middleware
+     app.get('/sse', oauthMiddleware, async (req: Request, res: Response) => {
+       // Create authenticated client from OAuth middleware result
+       let authenticatedClient: TwentyCRMClient | undefined;
+       const authData = (req as any).authenticatedClient;
+       if (authData?.apiKey) {
+         authenticatedClient = new TwentyCRMClient(authData.apiKey, logger);
+       }
+       
+       const server = createServer(authenticatedClient);
+       const transport = new SSEServerTransport('/sse', res);
+       
+       await server.connect(transport);
+     });
     
-    app.listen(PORT, () => {
-      logger.info(`Twenty CRM MCP Server listening on port ${PORT}`);
+    app.listen(MCP_PORT, () => {
+      logger.info(`Twenty CRM MCP Server listening on port ${MCP_PORT}`);
       logger.info('OAuth enabled with API Key authentication');
-      
-      if (transport === 'streamable-http') {
-        logger.info('Endpoints:');
-        logger.info(`  - MCP: POST/GET/DELETE ${BASE_URL}/mcp`);
-        logger.info(`  - OAuth Metadata: GET ${BASE_URL}/.well-known/oauth-protected-resource`);
-        logger.info(`  - OAuth Register: POST ${BASE_URL}/oauth/register`);
-        logger.info(`  - OAuth Authorize: GET ${BASE_URL}/oauth/authorize`);
-        logger.info(`  - OAuth Token: POST ${BASE_URL}/oauth/token`);
-      } else {
-        logger.info('SSE endpoints:');
-        logger.info(`  - SSE stream: GET ${BASE_URL}/sse`);
-        logger.info(`  - Messages: POST ${BASE_URL}/messages?sessionId=<id>`);
-      }
-      logger.info(`  - Health check: GET ${BASE_URL}/health`);
+      logger.info('Endpoints:');
+      logger.info(`  - SSE: GET http://localhost:${MCP_PORT}/sse`);
+      logger.info(`  - OAuth Metadata: GET http://localhost:${MCP_PORT}/.well-known/oauth-protected-resource`);
+      logger.info(`  - OAuth Register: POST http://localhost:${MCP_PORT}/oauth/register`);
+      logger.info(`  - OAuth Authorize: GET http://localhost:${MCP_PORT}/oauth/authorize`);
+      logger.info(`  - OAuth Token: POST http://localhost:${MCP_PORT}/oauth/token`);
+      logger.info(`  - Health check: GET http://localhost:${MCP_PORT}/health`);
     });
     
-  } else {
-    logger.error(`Unknown transport: ${transport}`);
-    process.exit(1);
+     } else if (transport === 'streamable-http') {
+     // Streamable HTTP transport (nach SDK-Pattern)
+     const app = express();
+     app.use(express.json());
+     app.use(cors({
+       origin: true,
+       credentials: true,
+       methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+       allowedHeaders: ['Content-Type', 'Authorization', 'mcp-session-id', 'Last-Event-ID']
+     }));
+     
+     // Initialize OAuth provider and middleware
+     const oauthProvider = new ApiKeyOAuthProvider(logger);
+     const oauthMiddleware = createOAuthMiddleware(oauthProvider);
+     
+     // Setup OAuth routes
+     const baseUrl = new URL(process.env.BASE_URL || `http://localhost:${MCP_PORT}`);
+     const oauthRouter = createApiKeyOAuthRouter({
+       provider: oauthProvider,
+       issuerUrl: baseUrl,
+       baseUrl,
+       serviceDocumentationUrl: new URL('https://docs.twenty.com/mcp')
+     });
+    app.use(oauthRouter);
+    
+    // Health check endpoint
+    app.get('/health', (req, res) => {
+      res.json({ status: 'healthy', transport: 'streamable-http' });
+    });
+    
+    // Map to store transports by session ID (nach SDK-Pattern)
+    const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+    
+              // MCP POST endpoint with OAuth middleware
+     const mcpPostHandler = async (req: Request, res: Response) => {
+       const sessionId = req.headers['mcp-session-id'] as string | undefined;
+       logger.info(sessionId ? `Received POST request to /mcp` : 'Received POST request to /mcp');
+       
+       // Store OAuth authentication in session for reuse
+       const authData = (req as any).authenticatedClient;
+       if (authData?.apiKey && sessionId) {
+         // Store the API key in the sessions map so getClient() can find it
+         const client = new TwentyCRMClient(authData.apiKey, logger);
+         sessions.set(sessionId, { 
+           apiKey: authData.apiKey, 
+           client, 
+           userId: (req as any).userId 
+         });
+         // Set as current request client for this request
+         currentRequestClient = client;
+         logger.info(`OAuth authentication successful for session ${sessionId}`);
+       }
+       
+       try {
+         let transport: StreamableHTTPServerTransport;
+         
+         if (sessionId && transports[sessionId]) {
+           // Reuse existing transport
+           transport = transports[sessionId];
+         } else if (!sessionId && isInitializeRequest(req.body)) {
+           // New initialization request
+           transport = new StreamableHTTPServerTransport({
+             sessionIdGenerator: () => randomUUID(),
+             onsessioninitialized: (sessionId) => {
+               logger.info(`Session initialized with ID: ${sessionId}`);
+               transports[sessionId] = transport;
+               
+               // Store OAuth auth for the new session if available
+               if (authData?.apiKey) {
+                 const client = new TwentyCRMClient(authData.apiKey, logger);
+                 sessions.set(sessionId, { 
+                   apiKey: authData.apiKey, 
+                   client, 
+                   userId: (req as any).userId 
+                 });
+                 // Set as current request client for this request
+                 currentRequestClient = client;
+                 logger.info(`OAuth authentication successful for new session ${sessionId}`);
+               }
+             }
+           });
+           
+           // Set up onclose handler to clean up transport
+           transport.onclose = () => {
+             const sid = transport.sessionId;
+             if (sid && transports[sid]) {
+               logger.info(`Transport closed for session ${sid}, removing from transports map`);
+               delete transports[sid];
+               sessions.delete(sid);
+             }
+           };
+           
+           // Connect the transport to the MCP server
+           const server = createServer();
+           await server.connect(transport);
+           
+           await transport.handleRequest(req, res, req.body);
+           return;
+         } else {
+           // Invalid request
+           res.status(400).json({
+             jsonrpc: '2.0',
+             error: {
+               code: -32000,
+               message: 'Bad Request: No valid session ID provided',
+             },
+             id: null,
+           });
+           return;
+         }
+         
+                  // Handle the request with existing transport
+         await transport.handleRequest(req, res, req.body);
+       } catch (error) {
+         logger.error('Error handling MCP request:', error);
+         if (!res.headersSent) {
+           res.status(500).json({
+             jsonrpc: '2.0',
+             error: {
+               code: -32603,
+               message: 'Internal server error',
+             },
+             id: null,
+           });
+         }
+       } finally {
+         // Reset current request client after each request
+         currentRequestClient = null;
+       }
+     };
+    
+    // MCP GET endpoint for SSE streams
+    const mcpGetHandler = async (req: Request, res: Response) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (!sessionId || !transports[sessionId]) {
+        res.status(400).send('Invalid or missing session ID');
+        return;
+      }
+      
+      // Check for Last-Event-ID header for resumability
+      const lastEventId = req.headers['last-event-id'] as string | undefined;
+      if (lastEventId) {
+        logger.info(`Client reconnecting with Last-Event-ID: ${lastEventId}`);
+      } else {
+        logger.info(`Establishing new SSE stream for session ${sessionId}`);
+      }
+      
+      const transport = transports[sessionId];
+      await transport.handleRequest(req, res);
+    };
+    
+    // MCP DELETE endpoint for session termination
+    const mcpDeleteHandler = async (req: Request, res: Response) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (!sessionId || !transports[sessionId]) {
+        res.status(400).send('Invalid or missing session ID');
+        return;
+      }
+      
+      logger.info(`Received DELETE request to /mcp`);
+      
+      try {
+        const transport = transports[sessionId];
+        await transport.handleRequest(req, res);
+      } catch (error) {
+        logger.error('Error handling session termination:', error);
+        if (!res.headersSent) {
+          res.status(500).send('Error processing session termination');
+        }
+      }
+    };
+    
+    // Setup routes with OAuth middleware
+    app.post('/mcp', oauthMiddleware, mcpPostHandler);
+    app.get('/mcp', oauthMiddleware, mcpGetHandler);
+    app.delete('/mcp', oauthMiddleware, mcpDeleteHandler);
+    
+    app.listen(MCP_PORT, () => {
+      logger.info(`Twenty CRM MCP Server listening on port ${MCP_PORT}`);
+      logger.info('OAuth enabled with API Key authentication');
+      logger.info('Endpoints:');
+      logger.info(`  - MCP: POST/GET/DELETE http://localhost:${MCP_PORT}/mcp`);
+      logger.info(`  - OAuth Metadata: GET http://localhost:${MCP_PORT}/.well-known/oauth-protected-resource`);
+      logger.info(`  - OAuth Register: POST http://localhost:${MCP_PORT}/oauth/register`);
+      logger.info(`  - OAuth Authorize: GET http://localhost:${MCP_PORT}/oauth/authorize`);
+      logger.info(`  - OAuth Token: POST http://localhost:${MCP_PORT}/oauth/token`);
+      logger.info(`  - Health check: GET http://localhost:${MCP_PORT}/health`);
+    });
+    
+    // Handle server shutdown
+    process.on('SIGINT', async () => {
+      logger.info('Shutting down Twenty CRM MCP Server...');
+      
+      // Close all active transports
+      for (const sessionId in transports) {
+        try {
+          logger.info(`Closing transport for session ${sessionId}`);
+          await transports[sessionId].close();
+          delete transports[sessionId];
+        } catch (error) {
+          logger.error(`Error closing transport for session ${sessionId}:`, error);
+        }
+      }
+      logger.info('Server shutdown complete');
+      process.exit(0);
+    });
   }
 }
-
-// Handle shutdown gracefully
-process.on('SIGINT', () => {
-  logger.info('Shutting down Twenty CRM MCP Server...');
-  process.exit(0);
-});
 
 // Start the server
 main().catch((error) => {

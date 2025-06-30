@@ -268,7 +268,7 @@ export class ApiKeyOAuthProvider {
  * Express middleware for OAuth token validation
  */
 export function createOAuthMiddleware(provider: ApiKeyOAuthProvider) {
-  return async (req: Request & { twentyApiKey?: string; userId?: string }, res: Response, next: Function) => {
+  return async (req: Request & { twentyApiKey?: string; userId?: string; authenticatedClient?: any }, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader?.startsWith('Bearer ')) {
@@ -283,9 +283,13 @@ export function createOAuthMiddleware(provider: ApiKeyOAuthProvider) {
     try {
       const tokenInfo = await provider.verifyAccessToken(token);
       
-      // Add to request
+      // Add to request - we already validated the client in verifyAccessToken
       req.twentyApiKey = tokenInfo.twentyApiKey;
       req.userId = tokenInfo.clientId;
+      
+      // Create TwentyCRMClient here to avoid circular dependency
+      // We'll pass the API key and let the handler create the client
+      req.authenticatedClient = { apiKey: tokenInfo.twentyApiKey };
       
       next();
     } catch (error) {
