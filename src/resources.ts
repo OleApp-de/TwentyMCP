@@ -238,6 +238,61 @@ POST /taskTargets
 
 ---
 
+## Notizen (Notes) API
+
+### Datenmodell Notiz
+
+#### Note Schema (Erstellen/Aktualisieren)
+\`\`\`json
+{
+  "title": "string",
+  "body": "string",
+  "bodyV2": {
+    "blocknote": "string",
+    "markdown": "string"
+  },
+  "position": "number",
+  "createdBy": {
+    "source": "EMAIL|CALENDAR|WORKFLOW|API|IMPORT|MANUAL|SYSTEM|WEBHOOK"
+  }
+}
+\`\`\`
+
+### API-Endpunkte für Notizen
+
+#### 1. Notiz erstellen
+\`\`\`http
+POST /notes
+\`\`\`
+
+---
+
+## NoteTargets API (Notiz-Verknüpfungen)
+
+NoteTargets verbinden Notizen mit Personen, Unternehmen oder anderen Objekten.
+
+### Datenmodell NoteTarget
+
+#### NoteTarget Schema
+\`\`\`json
+{
+  "noteId": "uuid",
+  "personId": "uuid",
+  "companyId": "uuid",
+  "opportunityId": "uuid",
+  "neusDatenmodelId": "uuid"
+}
+\`\`\`
+
+### API-Endpunkte für NoteTargets
+
+#### 1. NoteTarget erstellen
+\`\`\`http
+POST /noteTargets
+\`\`\`
+
+---
+
 ## Wichtige Status-Felder
 
 ### Task Status-Felder
@@ -334,7 +389,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **find-people-duplicates** - Duplikate finden
 
 ## ✅ Task Management
-- **create-task** - Neue Aufgabe erstellen
+- **create-task** - Neue Aufgabe erstellen (mit linkToCompanyId/linkToPersonId)
 - **get-task** - Aufgabe abrufen
 - **list-tasks** - Aufgaben auflisten/suchen
 - **update-task** - Aufgabe aktualisieren
@@ -354,6 +409,23 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **get-tasks-for-company** - Alle Aufgaben eines Unternehmens
 - **get-tasks-for-person** - Alle Aufgaben einer Person
 
+## 📝 Notes Management
+- **create-note** - Neue Notiz erstellen (mit linkToCompanyId/linkToPersonId)
+- **get-note** - Notiz abrufen
+- **list-notes** - Notizen auflisten/suchen
+- **update-note** - Notiz aktualisieren
+- **delete-note** - Notiz löschen
+- **batch-create-notes** - Mehrere Notizen erstellen
+- **find-note-duplicates** - Duplikate finden
+
+## 🔗 Note Target Management
+- **create-note-target** - Notiz-Verknüpfung erstellen
+- **get-note-target** - Verknüpfung abrufen
+- **list-note-targets** - Verknüpfungen auflisten
+- **update-note-target** - Verknüpfung aktualisieren
+- **delete-note-target** - Verknüpfung löschen
+- **get-notes-for-entity** - Alle Notizen für Unternehmen/Person abrufen
+
 ## 🖥️ System Tools
 - **get-server-info** - Server-Informationen
 
@@ -363,13 +435,13 @@ BASE URL: https://crm.tools.ole.de/rest/`
    → Speichere \`companyId\`
 
 2. **create-person** (mit \`companyId\`)
-   → Für jede identifizierte Person
+   → Für jede identifizierte Person, speichere \`personId\`
 
-3. **create-task** (Demo-Task)
-   → Speichere \`taskId\`
+3. **create-task** (mit \`linkToCompanyId\` und/oder \`linkToPersonId\`)
+   → Automatische Verknüpfung
 
-4. **link-task-to-company** (mit \`taskId\` + \`companyId\`)
-   → Verknüpfung erstellen
+4. **create-note** (optional, mit \`linkToCompanyId\` und/oder \`linkToPersonId\`)
+   → Meeting-Protokolle, Notizen etc.
 
 ## 🔍 Filter-Beispiele:
 

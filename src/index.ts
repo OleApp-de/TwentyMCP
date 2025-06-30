@@ -15,6 +15,8 @@ import { registerPeopleTools } from './tools/people.js';
 import { registerCompanyTools } from './tools/companies.js';
 import { registerTaskTools } from './tools/tasks.js';
 import { registerTaskTargetTools } from './tools/task-targets.js';
+import { registerNotesTools } from './tools/notes.js';
+import { registerNoteTargetTools } from './tools/note-targets.js';
 import { setupPromptHandlers } from './handlers.js';
 import { ApiKeyOAuthProvider, createOAuthMiddleware } from './auth/api-key-oauth-provider.js';
 import { createApiKeyOAuthRouter } from './auth/api-key-oauth-router.js';
@@ -79,7 +81,7 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
           name: 'twenty-crm-mcp',
           version: '1.0.0',
           transport,
-          capabilities: ['people', 'companies', 'tasks', 'task-targets', 'prompts', 'resources'],
+          capabilities: ['people', 'companies', 'tasks', 'task-targets', 'notes', 'note-targets', 'prompts', 'resources'],
           multiUser: true,
           requiresAuthentication: true,
           authMethods: ['api-key-tool', 'oauth-bearer'],
@@ -145,6 +147,8 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
   registerCompanyTools(server, getClient, logger);
   registerTaskTools(server, getClient, logger);
   registerTaskTargetTools(server, getClient, logger);
+  registerNotesTools(server, getClient, logger);
+  registerNoteTargetTools(server, getClient, logger);
 
   // Register prompt and resource handlers
   setupPromptHandlers(server);

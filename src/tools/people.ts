@@ -217,7 +217,8 @@ export function registerPeopleTools(
             text: JSON.stringify({
               success: true,
               person: response.data?.createPerson || null,
-              message: 'Person created successfully'
+              message: 'Person created successfully',
+              linkedToCompany: !!params.companyId
             }, null, 2)
           }]
         };

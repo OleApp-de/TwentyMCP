@@ -140,7 +140,7 @@ Erstelle mit den gesammelten Informationen:
 
 2. **Personen anlegen** mit Twenty API:
    - Verwende: create-person Tool für jede identifizierte Person
-   - Verknüpfe mit Unternehmen über companyId
+   - Nutze companyId Parameter um Person mit Unternehmen zu verknüpfen
    - Setze katgeorie: "KUNDE"
 
 3. **Demo-Aufgabe erstellen** mit Twenty API:
@@ -150,17 +150,24 @@ Erstelle mit den gesammelten Informationen:
    - Status: "${priority}"
    ${assigneeId ? `- AssigneeId: "${assigneeId}"` : ''}
    - dueAt: +7 Tage von heute (ISO 8601 Format)
+   - linkToCompanyId: [UUID des erstellten Unternehmens] (für Verknüpfung)
+   - linkToPersonId: [UUID der erstellten Person] (für Verknüpfung)
 
-4. **Aufgabe mit Unternehmen verknüpfen**:
-   - Verwende: link-task-to-company Tool
-   - Verknüpfe Task mit dem erstellten Unternehmen
+4. **Erstberatung-Notiz erstellen** (optional) mit Twenty API:
+   - Verwende: create-note Tool
+   - Titel: "Erstberatung [Unternehmensname]"
+   - bodyMarkdown: Strukturierte Notiz mit Gesprächsinhalten und nächsten Schritten
+   - linkToCompanyId: [UUID des erstellten Unternehmens] (für Verknüpfung)
+   - linkToPersonId: [UUID der Hauptkontaktperson] (für Verknüpfung)
 
 **WICHTIGE HINWEISE:**
 - Nutze die verfügbaren Twenty CRM Tools die ich dir zur Verfügung gestellt habe
 - Verwende web_search um fehlende Unternehmensdaten zu finden
 - Prüfe ob die recherchierten Informationen zum gewählten Unternehmenstyp "${unternehmenstyp}" passen
-- Führe die API-Calls in der richtigen Reihenfolge aus (erst Company, dann People, dann Task, dann TaskTarget)
-- Speichere die UUIDs der erstellten Einträge zwischen den Schritten
+- create-person akzeptiert companyId Parameter für direkte Verknüpfung
+- create-task akzeptiert linkToCompanyId und linkToPersonId Parameter für direkte Verknüpfung
+- create-note akzeptiert linkToCompanyId und linkToPersonId Parameter für direkte Verknüpfung
+- Dies reduziert die Anzahl der nötigen Verknüpfungs-API-Calls erheblich
 - Falls Daten unklar sind, frage mich bevor du API-Calls machst
 
 **STATUS-BEDEUTUNGEN:**
