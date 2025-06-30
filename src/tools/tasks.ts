@@ -134,25 +134,40 @@ export function registerTaskTools(
         const client = getClient(sessionId);
         
         logger.info(`Creating task: ${params.title}`);
+        logger.debug('Task creation params:', {
+          title: params.title,
+          linkToCompanyId: params.linkToCompanyId,
+          linkToPersonId: params.linkToPersonId,
+          hasCompanyLink: !!params.linkToCompanyId,
+          hasPersonLink: !!params.linkToPersonId
+        });
         
         const taskData: any = {
-          title: params.title,
           status: params.status || 'TODO'
         };
+
+        // Add title if provided (API docs show it's optional)
+        if (params.title) {
+          taskData.title = params.title;
+        }
 
         // Add body/description if provided
         if (params.body) {
           taskData.body = params.body;
         }
 
-        // Add bodyV2 if markdown or blocknote is provided (never send empty bodyV2)
+        // Add bodyV2 ONLY if we have actual content (never send empty)
         if (params.bodyMarkdown || params.bodyBlocknote) {
           taskData.bodyV2 = {};
-          if (params.bodyMarkdown) {
+          if (params.bodyMarkdown && params.bodyMarkdown.trim()) {
             taskData.bodyV2.markdown = params.bodyMarkdown;
           }
-          if (params.bodyBlocknote) {
+          if (params.bodyBlocknote && params.bodyBlocknote.trim()) {
             taskData.bodyV2.blocknote = params.bodyBlocknote;
+          }
+          // If bodyV2 ends up empty, don't send it
+          if (Object.keys(taskData.bodyV2).length === 0) {
+            delete taskData.bodyV2;
           }
         }
 
@@ -161,12 +176,14 @@ export function registerTaskTools(
         if (params.assigneeId) taskData.assigneeId = params.assigneeId;
         if (params.position !== undefined) taskData.position = params.position;
 
-        // Add creation source if provided
+        // Add creation source if provided (correct structure)
         if (params.createdBySource) {
           taskData.createdBy = {
             source: params.createdBySource
           };
         }
+        
+        logger.debug('Final taskData being sent to API:', taskData);
         
         const response = await client.makeRequest('POST', '/tasks', taskData);
         
@@ -181,30 +198,46 @@ export function registerTaskTools(
         // Create TaskTarget links if specified (programmatic convenience)
         if (params.linkToCompanyId) {
           try {
+            logger.info(`Attempting to link task ${taskId} to company ${params.linkToCompanyId}`);
             const linkData = {
               taskId: taskId,
               companyId: params.linkToCompanyId
             };
-            await client.makeRequest('POST', '/taskTargets', linkData);
+            logger.debug('TaskTarget linkData:', linkData);
+            const linkResponse = await client.makeRequest('POST', '/taskTargets', linkData);
+            logger.debug('TaskTarget response:', linkResponse);
             createdLinks.push(`Linked to company ${params.linkToCompanyId}`);
-            logger.info(`Task ${taskId} linked to company ${params.linkToCompanyId}`);
+            logger.info(`Task ${taskId} successfully linked to company ${params.linkToCompanyId}`);
           } catch (linkError) {
-            logger.error('Error linking task to company:', linkError);
+            logger.error('Error linking task to company:', {
+              error: linkError,
+              taskId,
+              companyId: params.linkToCompanyId,
+              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
             createdLinks.push(`Failed to link to company: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
           }
         }
         
         if (params.linkToPersonId) {
           try {
+            logger.info(`Attempting to link task ${taskId} to person ${params.linkToPersonId}`);
             const linkData = {
               taskId: taskId,
               personId: params.linkToPersonId
             };
-            await client.makeRequest('POST', '/taskTargets', linkData);
+            logger.debug('TaskTarget linkData:', linkData);
+            const linkResponse = await client.makeRequest('POST', '/taskTargets', linkData);
+            logger.debug('TaskTarget response:', linkResponse);
             createdLinks.push(`Linked to person ${params.linkToPersonId}`);
-            logger.info(`Task ${taskId} linked to person ${params.linkToPersonId}`);
+            logger.info(`Task ${taskId} successfully linked to person ${params.linkToPersonId}`);
           } catch (linkError) {
-            logger.error('Error linking task to person:', linkError);
+            logger.error('Error linking task to person:', {
+              error: linkError,
+              taskId,
+              personId: params.linkToPersonId,
+              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
             createdLinks.push(`Failed to link to person: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
           }
         }

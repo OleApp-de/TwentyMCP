@@ -115,7 +115,7 @@ export function registerNotesTools(
     {
       description: 'Create a new note in Twenty CRM',
       inputSchema: {
-        title: z.string().describe('Note title'),
+        title: z.string().optional().describe('Note title (optional)'),
         body: z.string().optional().describe('Note content/body (plain text)'),
         bodyMarkdown: z.string().optional().describe('Note content in markdown format'),
         bodyBlocknote: z.string().optional().describe('Note content in blocknote format'),
@@ -131,36 +131,52 @@ export function registerNotesTools(
         const client = getClient(sessionId);
         
         logger.info(`Creating note: ${params.title}`);
+        logger.debug('Note creation params:', {
+          title: params.title,
+          linkToCompanyId: params.linkToCompanyId,
+          linkToPersonId: params.linkToPersonId,
+          hasCompanyLink: !!params.linkToCompanyId,
+          hasPersonLink: !!params.linkToPersonId
+        });
         
-        const noteData: any = {
-          title: params.title
-        };
+        const noteData: any = {};
+
+        // Add title if provided (API docs show minimal request is {})
+        if (params.title) {
+          noteData.title = params.title;
+        }
 
         // Add body/description if provided
         if (params.body) {
           noteData.body = params.body;
         }
 
-        // Add bodyV2 if markdown or blocknote is provided (never send empty bodyV2)
+        // Add bodyV2 ONLY if we have actual content (never send empty)
         if (params.bodyMarkdown || params.bodyBlocknote) {
           noteData.bodyV2 = {};
-          if (params.bodyMarkdown) {
+          if (params.bodyMarkdown && params.bodyMarkdown.trim()) {
             noteData.bodyV2.markdown = params.bodyMarkdown;
           }
-          if (params.bodyBlocknote) {
+          if (params.bodyBlocknote && params.bodyBlocknote.trim()) {
             noteData.bodyV2.blocknote = params.bodyBlocknote;
+          }
+          // If bodyV2 ends up empty, don't send it
+          if (Object.keys(noteData.bodyV2).length === 0) {
+            delete noteData.bodyV2;
           }
         }
 
         // Add optional fields
         if (params.position !== undefined) noteData.position = params.position;
 
-        // Add creation source if provided
+        // Add creation source if provided (correct structure)
         if (params.createdBySource) {
           noteData.createdBy = {
             source: params.createdBySource
           };
         }
+        
+        logger.debug('Final noteData being sent to API:', noteData);
         
         const response = await client.makeRequest('POST', '/notes', noteData);
         
@@ -175,30 +191,46 @@ export function registerNotesTools(
         // Create NoteTarget links if specified (programmatic convenience)
         if (params.linkToCompanyId) {
           try {
+            logger.info(`Attempting to link note ${noteId} to company ${params.linkToCompanyId}`);
             const linkData = {
               noteId: noteId,
               companyId: params.linkToCompanyId
             };
-            await client.makeRequest('POST', '/noteTargets', linkData);
+            logger.debug('NoteTarget linkData:', linkData);
+            const linkResponse = await client.makeRequest('POST', '/noteTargets', linkData);
+            logger.debug('NoteTarget response:', linkResponse);
             createdLinks.push(`Linked to company ${params.linkToCompanyId}`);
-            logger.info(`Note ${noteId} linked to company ${params.linkToCompanyId}`);
+            logger.info(`Note ${noteId} successfully linked to company ${params.linkToCompanyId}`);
           } catch (linkError) {
-            logger.error('Error linking note to company:', linkError);
+            logger.error('Error linking note to company:', {
+              error: linkError,
+              noteId,
+              companyId: params.linkToCompanyId,
+              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
             createdLinks.push(`Failed to link to company: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
           }
         }
         
         if (params.linkToPersonId) {
           try {
+            logger.info(`Attempting to link note ${noteId} to person ${params.linkToPersonId}`);
             const linkData = {
               noteId: noteId,
               personId: params.linkToPersonId
             };
-            await client.makeRequest('POST', '/noteTargets', linkData);
+            logger.debug('NoteTarget linkData:', linkData);
+            const linkResponse = await client.makeRequest('POST', '/noteTargets', linkData);
+            logger.debug('NoteTarget response:', linkResponse);
             createdLinks.push(`Linked to person ${params.linkToPersonId}`);
-            logger.info(`Note ${noteId} linked to person ${params.linkToPersonId}`);
+            logger.info(`Note ${noteId} successfully linked to person ${params.linkToPersonId}`);
           } catch (linkError) {
-            logger.error('Error linking note to person:', linkError);
+            logger.error('Error linking note to person:', {
+              error: linkError,
+              noteId,
+              personId: params.linkToPersonId,
+              errorMessage: linkError instanceof Error ? linkError.message : 'Unknown error'
+            });
             createdLinks.push(`Failed to link to person: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
           }
         }
