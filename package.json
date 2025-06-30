@@ -1,0 +1,47 @@
+{
+  "name": "twenty-crm-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Twenty CRM with OAuth and multi-transport support",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:oauth": "node dist/index-oauth.js",
+    "dev": "tsx src/index.ts",
+    "dev:oauth": "tsx src/index-oauth.ts",
+    "dev:oauth:stdio": "tsx src/index-oauth.ts stdio",
+    "dev:oauth:sse": "tsx src/index-oauth.ts sse",
+    "dev:oauth:http": "tsx src/index-oauth.ts streamable-http",
+    "dev:unified": "tsx src/index-unified.ts",
+    "watch": "tsx watch src/index.ts",
+    "watch:oauth": "tsx watch src/index-oauth.ts"
+  },
+  "keywords": [
+    "mcp",
+    "twenty-crm",
+    "crm",
+    "oauth"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "@types/cookie-parser": "^1.4.9",
+    "axios": "^1.6.2",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.3"
+  }
+}
