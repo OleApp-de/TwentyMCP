@@ -120,9 +120,7 @@ export function registerNotesTools(
         bodyMarkdown: z.string().optional().describe('Note content in markdown format'),
         bodyBlocknote: z.string().optional().describe('Note content in blocknote format'),
         position: z.number().optional().describe('Position/order for sorting'),
-        createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation'),
-        linkToCompanyId: z.string().optional().describe('UUID of company to link this note to (creates NoteTarget automatically)'),
-        linkToPersonId: z.string().optional().describe('UUID of person to link this note to (creates NoteTarget automatically)')
+        createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation')
       }
     },
     async (params, extra) => {
@@ -141,7 +139,7 @@ export function registerNotesTools(
           noteData.body = params.body;
         }
 
-        // Add bodyV2 if markdown or blocknote is provided
+        // Add bodyV2 if markdown or blocknote is provided (never send empty bodyV2)
         if (params.bodyMarkdown || params.bodyBlocknote) {
           noteData.bodyV2 = {};
           if (params.bodyMarkdown) {
@@ -164,55 +162,13 @@ export function registerNotesTools(
         
         const response = await client.makeRequest('POST', '/notes', noteData);
         
-        const createdNote = response.data?.createNote;
-        if (!createdNote?.id) {
-          throw new Error('Failed to create note');
-        }
-        
-        const noteId = createdNote.id;
-        const createdLinks = [];
-        
-        // Create NoteTarget links if specified
-        if (params.linkToCompanyId) {
-          try {
-            const linkData = {
-              noteId: noteId,
-              companyId: params.linkToCompanyId
-            };
-            await client.makeRequest('POST', '/noteTargets', linkData);
-            createdLinks.push(`Linked to company ${params.linkToCompanyId}`);
-            logger.info(`Note ${noteId} linked to company ${params.linkToCompanyId}`);
-          } catch (linkError) {
-            logger.error('Error linking note to company:', linkError);
-            createdLinks.push(`Failed to link to company: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
-          }
-        }
-        
-        if (params.linkToPersonId) {
-          try {
-            const linkData = {
-              noteId: noteId,
-              personId: params.linkToPersonId
-            };
-            await client.makeRequest('POST', '/noteTargets', linkData);
-            createdLinks.push(`Linked to person ${params.linkToPersonId}`);
-            logger.info(`Note ${noteId} linked to person ${params.linkToPersonId}`);
-          } catch (linkError) {
-            logger.error('Error linking note to person:', linkError);
-            createdLinks.push(`Failed to link to person: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
-          }
-        }
-        
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               success: true,
-              note: createdNote,
-              message: 'Note created successfully',
-              linksCreated: createdLinks,
-              linkedToCompany: !!params.linkToCompanyId,
-              linkedToPerson: !!params.linkToPersonId
+              note: response.data?.createNote || null,
+              message: 'Note created successfully'
             }, null, 2)
           }]
         };

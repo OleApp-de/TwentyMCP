@@ -123,9 +123,7 @@ export function registerTaskTools(
         dueAt: z.string().optional().describe('Due date in ISO 8601 format (e.g. "2025-06-30T23:59:00.000Z")'),
         assigneeId: z.string().optional().describe('UUID of the user assigned to this task'),
         position: z.number().optional().describe('Position/order for sorting'),
-        createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation'),
-        linkToCompanyId: z.string().optional().describe('UUID of company to link this task to (creates TaskTarget automatically)'),
-        linkToPersonId: z.string().optional().describe('UUID of person to link this task to (creates TaskTarget automatically)')
+        createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation')
       }
     },
     async (params, extra) => {
@@ -145,7 +143,7 @@ export function registerTaskTools(
           taskData.body = params.body;
         }
 
-        // Add bodyV2 if markdown or blocknote is provided
+        // Add bodyV2 if markdown or blocknote is provided (never send empty bodyV2)
         if (params.bodyMarkdown || params.bodyBlocknote) {
           taskData.bodyV2 = {};
           if (params.bodyMarkdown) {
