@@ -286,16 +286,22 @@ async function main() {
           let transport: StreamableHTTPServerTransport;
           let server: McpServer;
           
-          // Always create new server and transport for each request
-          // This ensures proper initialization and avoids session conflicts
-          if (defaultClient) {
-            // Bearer token auth - create server with authenticated client
-            server = createMcpServer(defaultClient);
-          } else {
-            // No auth - create server without client
-            server = createMcpServer();
+          // If not authenticated, always return 401 to trigger OAuth flow
+          if (!defaultClient) {
+            logger.info('No authentication found - returning 401 to trigger OAuth');
+            res.setHeader('WWW-Authenticate', 'Bearer realm="Twenty CRM MCP"');
+            return res.status(401).json({
+              jsonrpc: '2.0',
+              error: {
+                code: -32001,
+                message: 'Authentication required'
+              },
+              id: null
+            });
           }
           
+          // We have authentication - create server with authenticated client
+          server = createMcpServer(defaultClient);
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => sessionId
           });
