@@ -42,13 +42,6 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
-# Traefik labels for SSE support
-LABEL traefik.enable=true
-LABEL traefik.http.services.twenty-mcp.loadbalancer.server.port=3000
-LABEL traefik.http.services.twenty-mcp.loadbalancer.server.buffering=false
-LABEL traefik.http.routers.twenty-mcp.timeout.read=86400s
-LABEL traefik.http.routers.twenty-mcp.timeout.write=86400s
-
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
