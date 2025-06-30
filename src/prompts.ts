@@ -150,33 +150,24 @@ Erstelle mit den gesammelten Informationen:
    - Status: "${priority}"
    ${assigneeId ? `- AssigneeId: "${assigneeId}"` : ''}
    - dueAt: +7 Tage von heute (ISO 8601 Format)
-   - WICHTIG: Speichere die Task-UUID aus der Antwort für nächsten Schritt!
+   - linkToCompanyId: [UUID des erstellten Unternehmens] (automatische Verknüpfung)
 
-4. **Aufgabe mit Unternehmen verknüpfen**:
-   - Verwende: create-task-target Tool  
-   - taskId: [UUID der erstellten Aufgabe aus Schritt 3]
-   - companyId: [UUID des erstellten Unternehmens aus Schritt 1]
-
-5. **Erstberatung-Notiz erstellen** (optional) mit Twenty API:
+4. **Erstberatung-Notiz erstellen** (optional) mit Twenty API:
    - Verwende: create-note Tool
    - Titel: "Erstberatung [Unternehmensname]"
    - bodyMarkdown: Strukturierte Notiz mit Gesprächsinhalten und nächsten Schritten
-   - WICHTIG: Speichere die Note-UUID aus der Antwort für nächsten Schritt!
-
-6. **Notiz mit Unternehmen und Person verknüpfen** (optional):
-   - Verwende: create-note-target Tool (2x aufrufen)
-   - 1. Aufruf: noteId + companyId [UUID des Unternehmens]  
-   - 2. Aufruf: noteId + personId [UUID der Hauptkontaktperson]
+   - linkToCompanyId: [UUID des erstellten Unternehmens] (automatische Verknüpfung)
+   - linkToPersonId: [UUID der Hauptkontaktperson] (automatische Verknüpfung)
 
 **WICHTIGE HINWEISE:**
 - Nutze die verfügbaren Twenty CRM Tools die ich dir zur Verfügung gestellt habe
 - Verwende web_search um fehlende Unternehmensdaten zu finden
 - Prüfe ob die recherchierten Informationen zum gewählten Unternehmenstyp "${unternehmenstyp}" passen
 - create-person akzeptiert companyId Parameter für direkte Verknüpfung
-- create-task erstellt NUR die Aufgabe - KEINE Verknüpfungsparameter verwenden!
-- create-note erstellt NUR die Notiz - KEINE Verknüpfungsparameter verwenden!  
-- Verwende create-task-target und create-note-target für Verknüpfungen in separaten Schritten
-- Dies ist der korrekte API-Workflow für Tasks und Notes
+- create-task akzeptiert linkToCompanyId und linkToPersonId Parameter (automatische Verknüpfung)
+- create-note akzeptiert linkToCompanyId und linkToPersonId Parameter (automatische Verknüpfung)
+- Dies reduziert die Anzahl der nötigen API-Calls erheblich
+- Alternativ können separate create-task-target/create-note-target Tools verwendet werden
 - Falls Daten unklar sind, frage mich bevor du API-Calls machst
 
 **STATUS-BEDEUTUNGEN:**

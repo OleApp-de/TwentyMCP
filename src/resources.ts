@@ -389,7 +389,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **find-people-duplicates** - Duplikate finden
 
 ## ✅ Task Management
-- **create-task** - Neue Aufgabe erstellen (OHNE Verknüpfungsparameter)
+- **create-task** - Neue Aufgabe erstellen (mit linkToCompanyId/linkToPersonId Convenience-Parametern)
 - **get-task** - Aufgabe abrufen
 - **list-tasks** - Aufgaben auflisten/suchen
 - **update-task** - Aufgabe aktualisieren
@@ -410,7 +410,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **get-tasks-for-person** - Alle Aufgaben einer Person
 
 ## 📝 Notes Management
-- **create-note** - Neue Notiz erstellen (OHNE Verknüpfungsparameter)
+- **create-note** - Neue Notiz erstellen (mit linkToCompanyId/linkToPersonId Convenience-Parametern)
 - **get-note** - Notiz abrufen
 - **list-notes** - Notizen auflisten/suchen
 - **update-note** - Notiz aktualisieren
@@ -437,17 +437,14 @@ BASE URL: https://crm.tools.ole.de/rest/`
 2. **create-person** (mit \`companyId\`)
    → Für jede identifizierte Person, speichere \`personId\`
 
-3. **create-task** (NUR Task-Daten, KEINE Verknüpfungen)
-   → Speichere \`taskId\`
+3. **create-task** (mit \`linkToCompanyId\` + \`linkToPersonId\`)
+   → Automatische Verknüpfung - EINFACHER!
 
-4. **create-task-target** (für Verknüpfung)
-   → \`taskId\` + \`companyId\` oder \`personId\`
+4. **create-note** (optional, mit \`linkToCompanyId\` + \`linkToPersonId\`)
+   → Meeting-Protokolle mit automatischer Verknüpfung
 
-5. **create-note** (optional, NUR Note-Daten)
-   → Speichere \`noteId\`
-
-6. **create-note-target** (für Verknüpfung)
-   → \`noteId\` + \`companyId\` oder \`personId\`
+**Alternative für Power-User:**
+- Separate \`create-task-target\` und \`create-note-target\` Tools verfügbar
 
 ## 🔍 Filter-Beispiele:
 

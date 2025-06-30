@@ -123,7 +123,9 @@ export function registerTaskTools(
         dueAt: z.string().optional().describe('Due date in ISO 8601 format (e.g. "2025-06-30T23:59:00.000Z")'),
         assigneeId: z.string().optional().describe('UUID of the user assigned to this task'),
         position: z.number().optional().describe('Position/order for sorting'),
-        createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation')
+        createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation'),
+        linkToCompanyId: z.string().optional().describe('UUID of company to link this task to (creates TaskTarget automatically)'),
+        linkToPersonId: z.string().optional().describe('UUID of person to link this task to (creates TaskTarget automatically)')
       }
     },
     async (params, extra) => {
@@ -168,13 +170,55 @@ export function registerTaskTools(
         
         const response = await client.makeRequest('POST', '/tasks', taskData);
         
+        const createdTask = response.data?.createTask;
+        if (!createdTask?.id) {
+          throw new Error('Failed to create task - no task ID in response');
+        }
+        
+        const taskId = createdTask.id;
+        const createdLinks = [];
+        
+        // Create TaskTarget links if specified (programmatic convenience)
+        if (params.linkToCompanyId) {
+          try {
+            const linkData = {
+              taskId: taskId,
+              companyId: params.linkToCompanyId
+            };
+            await client.makeRequest('POST', '/taskTargets', linkData);
+            createdLinks.push(`Linked to company ${params.linkToCompanyId}`);
+            logger.info(`Task ${taskId} linked to company ${params.linkToCompanyId}`);
+          } catch (linkError) {
+            logger.error('Error linking task to company:', linkError);
+            createdLinks.push(`Failed to link to company: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
+          }
+        }
+        
+        if (params.linkToPersonId) {
+          try {
+            const linkData = {
+              taskId: taskId,
+              personId: params.linkToPersonId
+            };
+            await client.makeRequest('POST', '/taskTargets', linkData);
+            createdLinks.push(`Linked to person ${params.linkToPersonId}`);
+            logger.info(`Task ${taskId} linked to person ${params.linkToPersonId}`);
+          } catch (linkError) {
+            logger.error('Error linking task to person:', linkError);
+            createdLinks.push(`Failed to link to person: ${linkError instanceof Error ? linkError.message : 'Unknown error'}`);
+          }
+        }
+        
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               success: true,
-              task: response.data?.createTask || null,
-              message: 'Task created successfully'
+              task: createdTask,
+              message: 'Task created successfully',
+              linksCreated: createdLinks,
+              linkedToCompany: !!params.linkToCompanyId,
+              linkedToPerson: !!params.linkToPersonId
             }, null, 2)
           }]
         };

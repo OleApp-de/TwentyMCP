@@ -1,8 +1,8 @@
 # Twenty CRM API - Korrekte Implementierung Test
 
-## ✅ Funktionierende Task-Erstellung (Minimaler Test)
+## ✅ Funktionierende Task-Erstellung 
 
-### 1. Task erstellen (ohne Verknüpfungsparameter)
+### 1. Task erstellen (minimal)
 ```json
 POST /rest/tasks
 {
@@ -10,29 +10,39 @@ POST /rest/tasks
 }
 ```
 
-### 2. Mit mehr Daten
+### 2. Task mit allen Details (korrekte API-Struktur)
 ```json
 POST /rest/tasks
 {
   "title": "Demo Accounts anlegen",
   "body": "Demo-Accounts für Müller Elektrotechnik erstellen",
+  "bodyV2": {
+    "markdown": "# Demo Accounts\n- Account 1\n- Account 2"
+  },
   "status": "TODO",
-  "dueAt": "2025-07-07T23:59:00.000Z"
+  "dueAt": "2025-07-07T23:59:00.000Z",
+  "assigneeId": "user-uuid",
+  "position": 1,
+  "createdBy": {
+    "source": "API"
+  }
 }
 ```
 
-### 3. TaskTarget für Verknüpfung
-```json
-POST /rest/taskTargets
-{
-  "taskId": "uuid-aus-schritt-2",
-  "companyId": "company-uuid"
-}
+### 3. MCP Tool: Task mit automatischer Verknüpfung
+```bash
+create-task \
+  title="Demo Accounts anlegen" \
+  body="Demo für Müller Elektrotechnik" \
+  status="TODO" \
+  linkToCompanyId="company-uuid" \
+  linkToPersonId="person-uuid"
 ```
+→ Erstellt Task UND TaskTargets automatisch!
 
-## ✅ Funktionierende Note-Erstellung (Minimaler Test)
+## ✅ Funktionierende Note-Erstellung
 
-### 1. Note erstellen (ohne Verknüpfungsparameter)
+### 1. Note erstellen (minimal)
 ```json
 POST /rest/notes
 {
@@ -40,34 +50,31 @@ POST /rest/notes
 }
 ```
 
-### 2. Mit mehr Daten
-```json
-POST /rest/notes
-{
-  "title": "Erstkontakt Müller Elektrotechnik",
-  "body": "Kontaktdaten erhalten und erste Informationen gesammelt"
-}
-```
-
-### 3. Mit Markdown
+### 2. Note mit allen Details (korrekte API-Struktur)
 ```json
 POST /rest/notes
 {
   "title": "Meeting Protokoll",
+  "body": "Besprochene Punkte im Meeting",
   "bodyV2": {
-    "markdown": "## Meeting Details\n\n- Datum: 2025-06-30\n- Ergebnis: Positiv"
+    "markdown": "## Meeting Agenda\n1. Punkt 1\n2. Punkt 2"
+  },
+  "position": 1,
+  "createdBy": {
+    "source": "MANUAL"
   }
 }
 ```
 
-### 4. NoteTarget für Verknüpfung
-```json
-POST /rest/noteTargets
-{
-  "noteId": "uuid-aus-schritt-2",
-  "companyId": "company-uuid"
-}
+### 3. MCP Tool: Note mit automatischer Verknüpfung
+```bash
+create-note \
+  title="Meeting Protokoll" \
+  bodyMarkdown="## Meeting\n- Ergebnis: Positiv" \
+  linkToCompanyId="company-uuid" \
+  linkToPersonId="person-uuid"
 ```
+→ Erstellt Note UND NoteTargets automatisch!
 
 ## ❌ Fehlerhafte Aufrufe (nicht verwenden!)
 
@@ -117,7 +124,7 @@ POST /rest/notes
    → Note ist auch mit Person verknüpft
 ```
 
-## 🚀 Vollständiger CRM-Enrichment Workflow
+## 🚀 Vollständiger CRM-Enrichment Workflow (EINFACH!)
 
 ```bash
 # 1. Company erstellen
@@ -128,21 +135,25 @@ create-company name="Müller Elektrotechnik" status="INTERESSE" unternehmenstyp=
 create-person firstName="Hans" lastName="Müller" companyId="comp-123" katgeorie="KUNDE"
 → personId = "pers-456" 
 
-# 3. Task erstellen (OHNE Verknüpfung)
-create-task title="Demo Accounts anlegen" body="Demo für Müller Elektrotechnik" status="TODO"
-→ taskId = "task-789"
+# 3. Task erstellen (MIT automatischer Verknüpfung)
+create-task \
+  title="Demo Accounts anlegen" \
+  body="Demo für Müller Elektrotechnik" \
+  status="TODO" \
+  linkToCompanyId="comp-123" \
+  linkToPersonId="pers-456"
+→ Erstellt Task UND beide TaskTargets automatisch!
 
-# 4. Task mit Company verknüpfen
-create-task-target taskId="task-789" companyId="comp-123"
-
-# 5. Note erstellen (OHNE Verknüpfung)
-create-note title="Erstkontakt" bodyMarkdown="## Erstkontakt\n- Interesse sehr hoch"
-→ noteId = "note-101"
-
-# 6. Note mit Company und Person verknüpfen
-create-note-target noteId="note-101" companyId="comp-123"
-create-note-target noteId="note-101" personId="pers-456"
+# 4. Note erstellen (MIT automatischer Verknüpfung)
+create-note \
+  title="Erstkontakt" \
+  bodyMarkdown="## Erstkontakt\n- Interesse sehr hoch" \
+  linkToCompanyId="comp-123" \
+  linkToPersonId="pers-456"
+→ Erstellt Note UND beide NoteTargets automatisch!
 ```
+
+**Statt 8 API-Calls nur noch 4! 🎉**
 
 ## 🎯 Key Takeaways
 
