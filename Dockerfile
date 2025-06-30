@@ -45,5 +45,5 @@ EXPOSE 3000
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the server with default streamable-http transport
-CMD ["node", "dist/index.js", "streamable-http"] 
+# Start the server with SSE transport
+CMD ["node", "dist/index.js", "sse"] 
