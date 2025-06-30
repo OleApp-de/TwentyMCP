@@ -116,9 +116,7 @@ export function registerNotesTools(
       description: 'Create a new note in Twenty CRM',
       inputSchema: {
         title: z.string().optional().describe('Note title (optional)'),
-        body: z.string().optional().describe('Note content/body (plain text)'),
-        bodyMarkdown: z.string().optional().describe('Note content in markdown format'),
-        bodyBlocknote: z.string().optional().describe('Note content in blocknote format'),
+        content: z.string().optional().describe('Note content/text (will be converted to markdown format automatically)'),
         position: z.number().optional().describe('Position/order for sorting'),
         createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation'),
         linkToCompanyId: z.string().optional().describe('UUID of company to link this note to (creates NoteTarget automatically)'),
@@ -139,29 +137,12 @@ export function registerNotesTools(
           noteData.title = params.title;
         }
 
-        // Add body/description if provided
-        if (params.body) {
-          noteData.body = params.body;
-        }
-
-        // Add bodyV2 ONLY if we have actual content (never send empty)
-        if (params.bodyMarkdown || params.bodyBlocknote) {
-          noteData.bodyV2 = {};
-          if (params.bodyMarkdown && params.bodyMarkdown.trim()) {
-            noteData.bodyV2.markdown = params.bodyMarkdown.trim();
-            // WICHTIG: API erwartet sowohl markdown als auch blocknote
-            // Wenn nur markdown gegeben ist, leeren blocknote setzen (API generiert automatisch)
-            if (!params.bodyBlocknote) {
-              noteData.bodyV2.blocknote = "";
-            }
-          }
-          if (params.bodyBlocknote && params.bodyBlocknote.trim()) {
-            noteData.bodyV2.blocknote = params.bodyBlocknote.trim();
-          }
-          // If bodyV2 ends up empty, don't send it
-          if (Object.keys(noteData.bodyV2).length === 0) {
-            delete noteData.bodyV2;
-          }
+        // Add content automatically as bodyV2.markdown if provided
+        if (params.content && params.content.trim()) {
+          noteData.bodyV2 = {
+            markdown: params.content.trim(),
+            blocknote: "" // API erwartet beide Felder, generiert automatisch blocknote aus markdown
+          };
         }
 
         // Add optional fields
@@ -268,9 +249,7 @@ export function registerNotesTools(
       inputSchema: {
         id: z.string().describe('UUID of the note to update'),
         title: z.string().optional().describe('Note title'),
-        body: z.string().optional().describe('Note content/body (plain text)'),
-        bodyMarkdown: z.string().optional().describe('Note content in markdown format'),
-        bodyBlocknote: z.string().optional().describe('Note content in blocknote format'),
+        content: z.string().optional().describe('Note content/text (will be converted to markdown format automatically)'),
         position: z.number().optional().describe('Position/order for sorting'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include in response (0-3, default 1)')
       }
@@ -288,25 +267,12 @@ export function registerNotesTools(
         if (params.title !== undefined) updateData.title = params.title;
         if (params.position !== undefined) updateData.position = params.position;
 
-        // Update body/description if provided
-        if (params.body !== undefined) {
-          updateData.body = params.body;
-        }
-
-        // Update bodyV2 if markdown or blocknote is provided
-        if (params.bodyMarkdown !== undefined || params.bodyBlocknote !== undefined) {
-          updateData.bodyV2 = {};
-          if (params.bodyMarkdown !== undefined) {
-            updateData.bodyV2.markdown = params.bodyMarkdown;
-            // WICHTIG: API erwartet sowohl markdown als auch blocknote
-            // Wenn nur markdown aktualisiert wird, leeren blocknote setzen
-            if (params.bodyBlocknote === undefined) {
-              updateData.bodyV2.blocknote = "";
-            }
-          }
-          if (params.bodyBlocknote !== undefined) {
-            updateData.bodyV2.blocknote = params.bodyBlocknote;
-          }
+        // Update content if provided (automatically converted to bodyV2.markdown)
+        if (params.content !== undefined) {
+          updateData.bodyV2 = {
+            markdown: params.content || "",
+            blocknote: "" // API erwartet beide Felder
+          };
         }
 
         const queryParams = new URLSearchParams();
@@ -390,8 +356,7 @@ export function registerNotesTools(
       inputSchema: {
         notes: z.array(z.object({
           title: z.string(),
-          body: z.string().optional(),
-          bodyMarkdown: z.string().optional(),
+          content: z.string().optional(),
           position: z.number().optional()
         })).describe('Array of notes to create')
       }
@@ -408,10 +373,9 @@ export function registerNotesTools(
             title: note.title
           };
           
-          if (note.body) noteData.body = note.body;
-          if (note.bodyMarkdown) {
+          if (note.content && note.content.trim()) {
             noteData.bodyV2 = { 
-              markdown: note.bodyMarkdown,
+              markdown: note.content.trim(),
               blocknote: "" // API benötigt beide Felder
             };
           }

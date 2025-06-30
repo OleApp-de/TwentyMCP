@@ -116,9 +116,7 @@ export function registerTaskTools(
       description: 'Create a new task in Twenty CRM',
       inputSchema: {
         title: z.string().describe('Task title'),
-        body: z.string().optional().describe('Task description/body (plain text)'),
-        bodyMarkdown: z.string().optional().describe('Task description in markdown format'),
-        bodyBlocknote: z.string().optional().describe('Task description in blocknote format'),
+        content: z.string().optional().describe('Task content/description (will be converted to markdown format automatically)'),
         status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional().describe('Task status (default: TODO)'),
         dueAt: z.string().optional().describe('Due date in ISO 8601 format (e.g. "2025-06-30T23:59:00.000Z")'),
         assigneeId: z.string().optional().describe('UUID of the user assigned to this task'),
@@ -144,29 +142,12 @@ export function registerTaskTools(
           taskData.title = params.title;
         }
 
-        // Add body/description if provided
-        if (params.body) {
-          taskData.body = params.body;
-        }
-
-        // Add bodyV2 ONLY if we have actual content (never send empty)
-        if (params.bodyMarkdown || params.bodyBlocknote) {
-          taskData.bodyV2 = {};
-          if (params.bodyMarkdown && params.bodyMarkdown.trim()) {
-            taskData.bodyV2.markdown = params.bodyMarkdown.trim();
-            // WICHTIG: API erwartet sowohl markdown als auch blocknote
-            // Wenn nur markdown gegeben ist, leeren blocknote setzen (API generiert automatisch)
-            if (!params.bodyBlocknote) {
-              taskData.bodyV2.blocknote = "";
-            }
-          }
-          if (params.bodyBlocknote && params.bodyBlocknote.trim()) {
-            taskData.bodyV2.blocknote = params.bodyBlocknote.trim();
-          }
-          // If bodyV2 ends up empty, don't send it
-          if (Object.keys(taskData.bodyV2).length === 0) {
-            delete taskData.bodyV2;
-          }
+        // Add content automatically as bodyV2.markdown if provided
+        if (params.content && params.content.trim()) {
+          taskData.bodyV2 = {
+            markdown: params.content.trim(),
+            blocknote: "" // API erwartet beide Felder, generiert automatisch blocknote aus markdown
+          };
         }
 
         // Add optional fields
@@ -275,9 +256,7 @@ export function registerTaskTools(
       inputSchema: {
         id: z.string().describe('UUID of the task to update'),
         title: z.string().optional().describe('Task title'),
-        body: z.string().optional().describe('Task description/body (plain text)'),
-        bodyMarkdown: z.string().optional().describe('Task description in markdown format'),
-        bodyBlocknote: z.string().optional().describe('Task description in blocknote format'),
+        content: z.string().optional().describe('Task content/description (will be converted to markdown format automatically)'),
         status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional().describe('Task status'),
         dueAt: z.string().nullable().optional().describe('Due date in ISO 8601 format (null to remove)'),
         assigneeId: z.string().nullable().optional().describe('UUID of the user assigned to this task (null to remove)'),
@@ -301,25 +280,12 @@ export function registerTaskTools(
         if (params.assigneeId !== undefined) updateData.assigneeId = params.assigneeId;
         if (params.position !== undefined) updateData.position = params.position;
 
-        // Update body/description if provided
-        if (params.body !== undefined) {
-          updateData.body = params.body;
-        }
-
-        // Update bodyV2 if markdown or blocknote is provided
-        if (params.bodyMarkdown !== undefined || params.bodyBlocknote !== undefined) {
-          updateData.bodyV2 = {};
-          if (params.bodyMarkdown !== undefined) {
-            updateData.bodyV2.markdown = params.bodyMarkdown;
-            // WICHTIG: API erwartet sowohl markdown als auch blocknote
-            // Wenn nur markdown aktualisiert wird, leeren blocknote setzen
-            if (params.bodyBlocknote === undefined) {
-              updateData.bodyV2.blocknote = "";
-            }
-          }
-          if (params.bodyBlocknote !== undefined) {
-            updateData.bodyV2.blocknote = params.bodyBlocknote;
-          }
+        // Update content if provided (automatically converted to bodyV2.markdown)
+        if (params.content !== undefined) {
+          updateData.bodyV2 = {
+            markdown: params.content || "",
+            blocknote: "" // API erwartet beide Felder
+          };
         }
 
         const queryParams = new URLSearchParams();
@@ -403,7 +369,7 @@ export function registerTaskTools(
       inputSchema: {
         tasks: z.array(z.object({
           title: z.string(),
-          body: z.string().optional(),
+          content: z.string().optional(),
           status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional(),
           dueAt: z.string().optional(),
           assigneeId: z.string().optional()
@@ -417,13 +383,21 @@ export function registerTaskTools(
         
         logger.info(`Batch creating ${tasks.length} tasks`);
         
-        const tasksData = tasks.map(task => ({
-          title: task.title,
-          status: task.status || 'TODO',
-          ...(task.body && { body: task.body }),
-          ...(task.dueAt && { dueAt: task.dueAt }),
-          ...(task.assigneeId && { assigneeId: task.assigneeId })
-        }));
+        const tasksData = tasks.map(task => {
+          const taskData: any = {
+            title: task.title,
+            status: task.status || 'TODO'
+          };
+          if (task.content && task.content.trim()) {
+            taskData.bodyV2 = {
+              markdown: task.content.trim(),
+              blocknote: ""
+            };
+          }
+          if (task.dueAt) taskData.dueAt = task.dueAt;
+          if (task.assigneeId) taskData.assigneeId = task.assigneeId;
+          return taskData;
+        });
         
         const response = await client.makeRequest('POST', '/batch/tasks', tasksData);
         

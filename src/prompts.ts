@@ -146,7 +146,7 @@ Erstelle mit den gesammelten Informationen:
 3. **Demo-Aufgabe erstellen** mit Twenty API:
    - Verwende: create-task Tool
    - Titel: "Demo Accounts anlegen"
-   - bodyMarkdown: "## Demo-Aufgabe\\n\\nDemo-Accounts für [Unternehmensname] (${unternehmenstyp}, Status: ${status}) erstellen und konfigurieren\\n\\n### Nächste Schritte:\\n- Account anlegen\\n- Konfiguration prüfen\\n- Tests durchführen"
+   - content: "## Demo-Aufgabe\\n\\nDemo-Accounts für [Unternehmensname] (${unternehmenstyp}, Status: ${status}) erstellen und konfigurieren\\n\\n### Nächste Schritte:\\n- Account anlegen\\n- Konfiguration prüfen\\n- Tests durchführen"
    - Status: "${priority}"
    ${assigneeId ? `- AssigneeId: "${assigneeId}"` : ''}
    - dueAt: +7 Tage von heute (ISO 8601 Format)
@@ -155,7 +155,7 @@ Erstelle mit den gesammelten Informationen:
 4. **Erstberatung-Notiz erstellen** (optional) mit Twenty API:
    - Verwende: create-note Tool
    - Titel: "Erstberatung [Unternehmensname]"
-   - bodyMarkdown: Strukturierte Notiz mit Gesprächsinhalten und nächsten Schritten
+   - content: Strukturierte Notiz mit Gesprächsinhalten und nächsten Schritten
    - linkToCompanyId: [UUID des erstellten Unternehmens aus Schritt 1] (automatische Verknüpfung)
    - linkToPersonId: [UUID der Hauptkontaktperson aus Schritt 2] (automatische Verknüpfung)
 
