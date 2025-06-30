@@ -2,19 +2,13 @@
   "name": "twenty-crm-mcp-server",
   "version": "1.0.0",
   "description": "MCP Server for Twenty CRM with OAuth and multi-transport support",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "start:oauth": "node dist/index-oauth.js",
     "dev": "tsx src/index.ts",
-    "dev:oauth": "tsx src/index-oauth.ts",
-    "dev:oauth:stdio": "tsx src/index-oauth.ts stdio",
-    "dev:oauth:sse": "tsx src/index-oauth.ts sse",
-    "dev:oauth:http": "tsx src/index-oauth.ts streamable-http",
-    "dev:unified": "tsx src/index-unified.ts",
-    "watch": "tsx watch src/index.ts",
-    "watch:oauth": "tsx watch src/index-oauth.ts"
+    "watch": "tsx watch src/index.ts"
   },
   "keywords": [
     "mcp",

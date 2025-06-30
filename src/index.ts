@@ -386,23 +386,25 @@ async function main() {
     });
     
     const PORT = process.env.PORT || 3000;
+    const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+    
     app.listen(PORT, () => {
       logger.info(`Twenty CRM MCP Server listening on port ${PORT}`);
       logger.info('OAuth enabled with API Key authentication');
       
       if (transport === 'streamable-http') {
         logger.info('Endpoints:');
-        logger.info(`  - MCP: POST/GET/DELETE http://localhost:${PORT}/mcp`);
-        logger.info(`  - OAuth Metadata: GET http://localhost:${PORT}/.well-known/oauth-protected-resource`);
-        logger.info(`  - OAuth Register: POST http://localhost:${PORT}/oauth/register`);
-        logger.info(`  - OAuth Authorize: GET http://localhost:${PORT}/oauth/authorize`);
-        logger.info(`  - OAuth Token: POST http://localhost:${PORT}/oauth/token`);
+        logger.info(`  - MCP: POST/GET/DELETE ${BASE_URL}/mcp`);
+        logger.info(`  - OAuth Metadata: GET ${BASE_URL}/.well-known/oauth-protected-resource`);
+        logger.info(`  - OAuth Register: POST ${BASE_URL}/oauth/register`);
+        logger.info(`  - OAuth Authorize: GET ${BASE_URL}/oauth/authorize`);
+        logger.info(`  - OAuth Token: POST ${BASE_URL}/oauth/token`);
       } else {
         logger.info('SSE endpoints:');
-        logger.info(`  - SSE stream: GET http://localhost:${PORT}/sse`);
-        logger.info(`  - Messages: POST http://localhost:${PORT}/messages?sessionId=<id>`);
+        logger.info(`  - SSE stream: GET ${BASE_URL}/sse`);
+        logger.info(`  - Messages: POST ${BASE_URL}/messages?sessionId=<id>`);
       }
-      logger.info(`  - Health check: GET http://localhost:${PORT}/health`);
+      logger.info(`  - Health check: GET ${BASE_URL}/health`);
     });
     
   } else {

@@ -364,7 +364,7 @@ export function createApiKeyOAuthRouter(options: OAuthRouterOptions): Router {
                 <div class="step">2. <strong>Connect again</strong> with these settings:</div>
                 <ul>
                   <li>Transport: <strong>HTTP</strong></li>
-                  <li>URL: <strong>http://localhost:3000/mcp</strong></li>
+                  <li>URL: <strong>${options.baseUrl}/mcp</strong></li>
                   <li>Click "Headers" and add:</li>
                 </ul>
                 <div class="step">3. <strong>Add this Authorization header:</strong></div>
