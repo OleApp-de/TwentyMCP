@@ -110,6 +110,17 @@ export function createApiKeyOAuthRouter(options: OAuthRouterOptions): Router {
       });
     }
     
+    // Validate redirect_uri
+    const requestedRedirectUri = String(redirect_uri);
+    const isValidRedirectUri = client.redirect_uris.some(uri => uri === requestedRedirectUri);
+    
+    if (!isValidRedirectUri) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Invalid redirect_uri'
+      });
+    }
+    
     try {
       // Extract session ID from various sources
       let sessionId: string | undefined;

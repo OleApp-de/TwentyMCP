@@ -93,7 +93,38 @@ export class ApiKeyOAuthProvider {
    * Get registered client info
    */
   async getClient(clientId: string): Promise<ClientInfo | null> {
-    return registeredClients.get(clientId) || null;
+    // Check if it's already registered
+    const registered = registeredClients.get(clientId);
+    if (registered) {
+      return registered;
+    }
+    
+    // Known Claude Web client IDs - auto-accept these
+    const knownClaudeClients = [
+      '3c3f95df-539b-4e16-b383-87d870159c21',
+      // Add more as needed
+    ];
+    
+    if (knownClaudeClients.includes(clientId)) {
+      // Auto-register known Claude client
+      const client: ClientInfo = {
+        client_id: clientId,
+        client_secret: undefined, // Claude uses PKCE, no secret needed
+        redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        client_name: 'Claude Web',
+        scope: 'read write'
+      };
+      
+      // Store for this session
+      registeredClients.set(clientId, client);
+      this.logger.info(`Auto-registered known Claude client: ${clientId}`);
+      
+      return client;
+    }
+    
+    return null;
   }
 
   /**
