@@ -19,7 +19,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "latest",
+    "@modelcontextprotocol/sdk": "^1.13.2",
     "@types/cookie-parser": "^1.4.9",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",

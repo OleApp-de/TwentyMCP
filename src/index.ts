@@ -14,8 +14,8 @@ import { TwentyCRMClient } from './twenty-client.js';
 import { registerPeopleTools } from './tools/people.js';
 import { registerCompanyTools } from './tools/companies.js';
 import { registerTaskTools } from './tools/tasks.js';
-import { registerNoteTools } from './tools/notes.js';
-import { registerOpportunityTools } from './tools/opportunities.js';
+import { registerTaskTargetTools } from './tools/task-targets.js';
+import { setupPromptHandlers } from './handlers.js';
 import { ApiKeyOAuthProvider, createOAuthMiddleware } from './auth/api-key-oauth-provider.js';
 import { createApiKeyOAuthRouter } from './auth/api-key-oauth-router.js';
 
@@ -57,7 +57,13 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
   const server = new McpServer({
     name: 'twenty-crm-mcp',
     version: '1.0.0'
-  }, { capabilities: { logging: {} } });
+  }, { 
+    capabilities: { 
+      logging: {},
+      prompts: {},
+      resources: {}
+    } 
+  });
 
   // Register server info tool
   server.registerTool(
@@ -73,7 +79,7 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
           name: 'twenty-crm-mcp',
           version: '1.0.0',
           transport,
-          capabilities: ['people', 'companies', 'tasks', 'notes', 'opportunities'],
+          capabilities: ['people', 'companies', 'tasks', 'task-targets', 'prompts', 'resources'],
           multiUser: true,
           requiresAuthentication: true,
           authMethods: ['api-key-tool', 'oauth-bearer'],
@@ -89,40 +95,6 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
     })
   );
 
-  // Register authentication tool (REQUIRED for multi-user when no global auth)
-  server.registerTool(
-    'authenticate',
-    {
-      description: 'Set API key for Twenty CRM authentication (REQUIRED for each user session unless using Bearer token)',
-      inputSchema: {
-        apiKey: z.string().describe('Twenty CRM API key (Bearer token)')
-      }
-    },
-    async ({ apiKey }, extra) => {
-      const sessionId = String(extra?.requestId || 'default');
-      const client = new TwentyCRMClient(apiKey, logger);
-      
-      try {
-        await client.testConnection();
-        sessions.set(sessionId, { apiKey, client });
-        
-        return {
-          content: [{
-            type: 'text',
-            text: `Authentication successful! Session ${sessionId} is now authenticated. You can now use Twenty CRM tools.`
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{
-            type: 'text',
-            text: `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-          }],
-          isError: true
-        };
-      }
-    }
-  );
 
   // Helper to get client
   const getClient = (sessionId: string = 'default'): TwentyCRMClient => {
@@ -172,8 +144,10 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
   registerPeopleTools(server, getClient, logger);
   registerCompanyTools(server, getClient, logger);
   registerTaskTools(server, getClient, logger);
-  registerNoteTools(server, getClient, logger);
-  registerOpportunityTools(server, getClient, logger);
+  registerTaskTargetTools(server, getClient, logger);
+
+  // Register prompt and resource handlers
+  setupPromptHandlers(server);
 
   return server;
 };

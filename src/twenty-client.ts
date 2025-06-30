@@ -278,4 +278,15 @@ export class TwentyCRMClient {
   async createOneOpportunity(data: Opportunity): Promise<void> {
     await this.client.post('/opportunities', data);
   }
+
+  // Generic HTTP request method
+  async makeRequest(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', endpoint: string, data?: any, params?: any): Promise<any> {
+    const response = await this.client.request({
+      method,
+      url: endpoint,
+      data,
+      params
+    });
+    return response.data;
+  }
 }

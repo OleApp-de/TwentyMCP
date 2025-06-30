@@ -1,82 +1,63 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { TwentyCRMClient } from '../twenty-client.js';
 import { z } from 'zod';
 import { Logger } from 'winston';
-import { TwentyCRMClient } from '../twenty-client.js';
 
 export function registerPeopleTools(
   server: McpServer,
   getClient: (sessionId?: string) => TwentyCRMClient,
   logger: Logger
-) {
-  // List people
+): void {
+
+  // 1. List People Tool
   server.registerTool(
     'list-people',
     {
-
-      description: 'Find and list people/contacts in Twenty CRM',
+      description: 'List and search people/contacts in Twenty CRM with advanced filtering and pagination',
       inputSchema: {
-        orderBy: z.string().optional().describe('Field to order by (e.g., "createdAt", "name.lastName")'),
-        filter: z.record(z.any()).optional().describe('Filter criteria as JSON object'),
-        limit: z.number().min(1).max(60).optional().default(20).describe('Number of records to return'),
-        depth: z.number().min(0).max(3).optional().describe('Depth of related data to include'),
-        startingAfter: z.string().optional().describe('Cursor for pagination - starting after'),
-        endingBefore: z.string().optional().describe('Cursor for pagination - ending before'),
-        search: z.string().optional().describe('Search in name, email, job title, or company')
+        orderBy: z.string().optional().describe('Sort order (e.g. "createdAt", "name.lastName", "name.firstName")'),
+        filter: z.string().optional().describe('Filter criteria as JSON string (e.g. \'{"katgeorie":{"eq":"KUNDE"}}\')'),
+        limit: z.number().min(1).max(60).optional().describe('Number of results to return (max 60, default 20)'),
+        depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)'),
+        startingAfter: z.string().optional().describe('Cursor for pagination - start after this ID'),
+        endingBefore: z.string().optional().describe('Cursor for pagination - end before this ID')
       }
     },
-    async (params, extra) => {
+    async ({ orderBy, filter, limit = 20, depth = 1, startingAfter, endingBefore }, extra) => {
       try {
-        const client = getClient(String(extra?.requestId || 'default'));
+        const sessionId = String(extra?.requestId || 'default');
+        const client = getClient(sessionId);
         
-        // Build filter if search is provided
-        let filter = params.filter || {};
-        if (params.search) {
-          filter = {
-            or: [
-              { 'name.firstName': { ilike: `%${params.search}%` } },
-              { 'name.lastName': { ilike: `%${params.search}%` } },
-              { email: { ilike: `%${params.search}%` } },
-              { jobTitle: { ilike: `%${params.search}%` } }
-            ]
-          };
-        }
-
-        const response = await client.findManyPeople({
-          orderBy: params.orderBy,
-          filter,
-          limit: params.limit,
-          depth: params.depth,
-          startingAfter: params.startingAfter,
-          endingBefore: params.endingBefore
-        });
-
-        const people = response.data.people || [];
+        logger.info(`Listing people with params:`, { orderBy, filter, limit, depth });
+        
+        const queryParams = new URLSearchParams();
+        if (orderBy) queryParams.append('orderBy', orderBy);
+        if (filter) queryParams.append('filter', filter);
+        queryParams.append('limit', limit.toString());
+        queryParams.append('depth', depth.toString());
+        if (startingAfter) queryParams.append('startingAfter', startingAfter);
+        if (endingBefore) queryParams.append('endingBefore', endingBefore);
+        
+        const response = await client.makeRequest('GET', `/people?${queryParams.toString()}`);
         
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
-              count: people.length,
-              totalCount: response.totalCount,
-              hasMore: response.pageInfo?.hasNextPage,
-              people: people.map(p => ({
-                id: p.id,
-                name: `${p.name?.firstName || ''} ${p.name?.lastName || ''}`.trim(),
-                email: p.email,
-                jobTitle: p.jobTitle,
-                company: p.company?.name,
-                phone: p.phone,
-                city: p.city
-              }))
+              people: response.data?.people || [],
+              pageInfo: response.pageInfo || {},
+              totalCount: response.totalCount || 0,
+              query: { orderBy, filter, limit, depth, startingAfter, endingBefore }
             }, null, 2)
           }]
         };
+        
       } catch (error) {
         logger.error('Error listing people:', error);
         return {
           content: [{
             type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: `Error listing people: ${error instanceof Error ? error.message : 'Unknown error'}`
           }],
           isError: true
         };
@@ -84,35 +65,43 @@ export function registerPeopleTools(
     }
   );
 
-  // Get person details
+  // 2. Get Person Tool
   server.registerTool(
     'get-person',
     {
-
-      description: 'Get detailed information about a specific person',
+      description: 'Get detailed information about a specific person by ID',
       inputSchema: {
-        id: z.string().describe('Person ID'),
-        depth: z.number().min(0).max(3).optional().default(1).describe('Depth of related data to include')
+        id: z.string().describe('UUID of the person to retrieve'),
+        depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)')
       }
     },
-    async (params, extra) => {
+    async ({ id, depth = 1 }, extra) => {
       try {
-        const client = getClient(String(extra?.requestId || 'default'));
-        const response = await client.findOnePerson(params.id, params.depth);
-        const person = response.data.person;
-
+        const sessionId = String(extra?.requestId || 'default');
+        const client = getClient(sessionId);
+        
+        logger.info(`Getting person ${id} with depth ${depth}`);
+        
+        const queryParams = new URLSearchParams();
+        queryParams.append('depth', depth.toString());
+        
+        const response = await client.makeRequest('GET', `/people/${id}?${queryParams.toString()}`);
+        
         return {
           content: [{
             type: 'text',
-            text: JSON.stringify(person, null, 2)
+            text: JSON.stringify({
+              person: response.data?.person || null
+            }, null, 2)
           }]
         };
+        
       } catch (error) {
         logger.error('Error getting person:', error);
         return {
           content: [{
             type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: `Error getting person: ${error instanceof Error ? error.message : 'Unknown error'}`
           }],
           isError: true
         };
@@ -120,69 +109,125 @@ export function registerPeopleTools(
     }
   );
 
-  // Create person
+  // 3. Create Person Tool
   server.registerTool(
     'create-person',
     {
-
       description: 'Create a new person/contact in Twenty CRM',
       inputSchema: {
-        firstName: z.string().describe('First name'),
-        lastName: z.string().optional().describe('Last name'),
-        email: z.string().email().optional().describe('Email address'),
-        phone: z.string().optional().describe('Phone number'),
-        jobTitle: z.string().optional().describe('Job title'),
-        companyId: z.string().optional().describe('Company ID to associate with'),
-        city: z.string().optional().describe('City'),
-        whatsapp: z.string().optional().describe('WhatsApp number'),
+        firstName: z.string().describe('First name of the person'),
+        lastName: z.string().describe('Last name of the person'),
+        primaryEmail: z.string().email().optional().describe('Primary email address'),
+        additionalEmails: z.array(z.string().email()).optional().describe('Additional email addresses'),
+        primaryPhoneNumber: z.string().optional().describe('Primary phone number'),
+        primaryPhoneCountryCode: z.string().optional().describe('Phone country code (e.g. "DE")'),
+        primaryPhoneCallingCode: z.string().optional().describe('Phone calling code (e.g. "+49")'),
+        additionalPhones: z.array(z.string()).optional().describe('Additional phone numbers'),
+        companyId: z.string().optional().describe('UUID of the company this person belongs to'),
+        jobTitle: z.string().optional().describe('Job title/position'),
+        city: z.string().optional().describe('City where the person is located'),
+        avatarUrl: z.string().url().optional().describe('URL to avatar image'),
+        position: z.number().optional().describe('Position/order for sorting'),
+        katgeorie: z.enum(['KUNDE', 'VERBÄNDE', 'PARTNER', 'DIENSTLEISTER']).optional().describe('Person category'),
         linkedinUrl: z.string().url().optional().describe('LinkedIn profile URL'),
-        intro: z.string().optional().describe('Introduction/notes'),
-        workPreference: z.string().optional().describe('Work preference'),
-        performanceRating: z.number().min(0).max(10).optional().describe('Performance rating (0-10)')
+        linkedinLabel: z.string().optional().describe('LinkedIn link label'),
+        xUrl: z.string().url().optional().describe('X/Twitter profile URL'),
+        xLabel: z.string().optional().describe('X/Twitter link label'),
+        createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation')
       }
     },
     async (params, extra) => {
       try {
-        const client = getClient(String(extra?.requestId || 'default'));
+        const sessionId = String(extra?.requestId || 'default');
+        const client = getClient(sessionId);
         
-        const data: any = {
+        logger.info(`Creating person: ${params.firstName} ${params.lastName}`);
+        
+        const personData: any = {
           name: {
             firstName: params.firstName,
             lastName: params.lastName
-          },
-          email: params.email,
-          phone: params.phone,
-          jobTitle: params.jobTitle,
-          companyId: params.companyId,
-          city: params.city,
-          whatsapp: params.whatsapp,
-          intro: params.intro,
-          workPreference: params.workPreference,
-          performanceRating: params.performanceRating
+          }
         };
 
+        // Add emails if provided
+        if (params.primaryEmail || params.additionalEmails) {
+          personData.emails = {};
+          if (params.primaryEmail) {
+            personData.emails.primaryEmail = params.primaryEmail;
+          }
+          if (params.additionalEmails && params.additionalEmails.length > 0) {
+            personData.emails.additionalEmails = params.additionalEmails;
+          }
+        }
+
+        // Add phones if provided
+        if (params.primaryPhoneNumber || params.additionalPhones) {
+          personData.phones = {};
+          if (params.primaryPhoneNumber) {
+            personData.phones.primaryPhoneNumber = params.primaryPhoneNumber;
+            if (params.primaryPhoneCountryCode) {
+              personData.phones.primaryPhoneCountryCode = params.primaryPhoneCountryCode;
+            }
+            if (params.primaryPhoneCallingCode) {
+              personData.phones.primaryPhoneCallingCode = params.primaryPhoneCallingCode;
+            }
+          }
+          if (params.additionalPhones && params.additionalPhones.length > 0) {
+            personData.phones.additionalPhones = params.additionalPhones;
+          }
+        }
+
+        // Add optional fields
+        if (params.companyId) personData.companyId = params.companyId;
+        if (params.jobTitle) personData.jobTitle = params.jobTitle;
+        if (params.city) personData.city = params.city;
+        if (params.avatarUrl) personData.avatarUrl = params.avatarUrl;
+        if (params.position !== undefined) personData.position = params.position;
+        if (params.katgeorie) personData.katgeorie = params.katgeorie;
+
+        // Add LinkedIn link if provided
         if (params.linkedinUrl) {
-          data.linkedinLink = {
+          personData.linkedinLink = {
             primaryLinkUrl: params.linkedinUrl,
-            primaryLinkLabel: 'LinkedIn'
+            primaryLinkLabel: params.linkedinLabel || 'LinkedIn'
           };
         }
 
-        const response = await client.createOnePerson(data, 1);
-        const person = response.data.createPerson;
+        // Add X/Twitter link if provided
+        if (params.xUrl) {
+          personData.xLink = {
+            primaryLinkUrl: params.xUrl,
+            primaryLinkLabel: params.xLabel || 'X'
+          };
+        }
 
+        // Add creation source if provided
+        if (params.createdBySource) {
+          personData.createdBy = {
+            source: params.createdBySource
+          };
+        }
+        
+        const response = await client.makeRequest('POST', '/people', personData);
+        
         return {
           content: [{
             type: 'text',
-            text: `Created person: ${person.name?.firstName} ${person.name?.lastName || ''} (ID: ${person.id})`
+            text: JSON.stringify({
+              success: true,
+              person: response.data?.createPerson || null,
+              message: 'Person created successfully'
+            }, null, 2)
           }]
         };
+        
       } catch (error) {
         logger.error('Error creating person:', error);
         return {
           content: [{
             type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: `Error creating person: ${error instanceof Error ? error.message : 'Unknown error'}`
           }],
           isError: true
         };
@@ -190,73 +235,126 @@ export function registerPeopleTools(
     }
   );
 
-  // Update person
+  // 4. Update Person Tool
   server.registerTool(
     'update-person',
     {
-
-      description: 'Update an existing person/contact',
+      description: 'Update an existing person/contact in Twenty CRM',
       inputSchema: {
-        id: z.string().describe('Person ID'),
-        firstName: z.string().optional().describe('First name'),
-        lastName: z.string().optional().describe('Last name'),
-        email: z.string().email().optional().describe('Email address'),
-        phone: z.string().optional().describe('Phone number'),
-        jobTitle: z.string().optional().describe('Job title'),
-        companyId: z.string().optional().describe('Company ID to associate with'),
-        city: z.string().optional().describe('City'),
-        whatsapp: z.string().optional().describe('WhatsApp number'),
+        id: z.string().describe('UUID of the person to update'),
+        firstName: z.string().optional().describe('First name of the person'),
+        lastName: z.string().optional().describe('Last name of the person'),
+        primaryEmail: z.string().email().optional().describe('Primary email address'),
+        additionalEmails: z.array(z.string().email()).optional().describe('Additional email addresses'),
+        primaryPhoneNumber: z.string().optional().describe('Primary phone number'),
+        primaryPhoneCountryCode: z.string().optional().describe('Phone country code (e.g. "DE")'),
+        primaryPhoneCallingCode: z.string().optional().describe('Phone calling code (e.g. "+49")'),
+        additionalPhones: z.array(z.string()).optional().describe('Additional phone numbers'),
+        companyId: z.string().nullable().optional().describe('UUID of the company (null to remove)'),
+        jobTitle: z.string().optional().describe('Job title/position'),
+        city: z.string().optional().describe('City where the person is located'),
+        avatarUrl: z.string().url().optional().describe('URL to avatar image'),
+        position: z.number().optional().describe('Position/order for sorting'),
+        katgeorie: z.enum(['KUNDE', 'VERBÄNDE', 'PARTNER', 'DIENSTLEISTER']).optional().describe('Person category'),
         linkedinUrl: z.string().url().optional().describe('LinkedIn profile URL'),
-        intro: z.string().optional().describe('Introduction/notes'),
-        workPreference: z.string().optional().describe('Work preference'),
-        performanceRating: z.number().min(0).max(10).optional().describe('Performance rating (0-10)')
+        linkedinLabel: z.string().optional().describe('LinkedIn link label'),
+        xUrl: z.string().url().optional().describe('X/Twitter profile URL'),
+        xLabel: z.string().optional().describe('X/Twitter link label'),
+        depth: z.number().min(0).max(3).optional().describe('Depth of related data to include in response (0-3, default 1)')
       }
     },
     async (params, extra) => {
       try {
-        const client = getClient(String(extra?.requestId || 'default'));
-        const { id, ...updateData } = params;
+        const sessionId = String(extra?.requestId || 'default');
+        const client = getClient(sessionId);
         
-        const data: any = {};
+        logger.info(`Updating person ${params.id}`);
         
-        if (updateData.firstName !== undefined || updateData.lastName !== undefined) {
-          data.name = {};
-          if (updateData.firstName !== undefined) data.name.firstName = updateData.firstName;
-          if (updateData.lastName !== undefined) data.name.lastName = updateData.lastName;
+        const updateData: any = {};
+
+        // Update name if provided
+        if (params.firstName || params.lastName) {
+          updateData.name = {};
+          if (params.firstName) updateData.name.firstName = params.firstName;
+          if (params.lastName) updateData.name.lastName = params.lastName;
         }
-        
-        if (updateData.email !== undefined) data.email = updateData.email;
-        if (updateData.phone !== undefined) data.phone = updateData.phone;
-        if (updateData.jobTitle !== undefined) data.jobTitle = updateData.jobTitle;
-        if (updateData.companyId !== undefined) data.companyId = updateData.companyId;
-        if (updateData.city !== undefined) data.city = updateData.city;
-        if (updateData.whatsapp !== undefined) data.whatsapp = updateData.whatsapp;
-        if (updateData.intro !== undefined) data.intro = updateData.intro;
-        if (updateData.workPreference !== undefined) data.workPreference = updateData.workPreference;
-        if (updateData.performanceRating !== undefined) data.performanceRating = updateData.performanceRating;
-        
-        if (updateData.linkedinUrl) {
-          data.linkedinLink = {
-            primaryLinkUrl: updateData.linkedinUrl,
-            primaryLinkLabel: 'LinkedIn'
+
+        // Update emails if provided
+        if (params.primaryEmail !== undefined || params.additionalEmails !== undefined) {
+          updateData.emails = {};
+          if (params.primaryEmail !== undefined) {
+            updateData.emails.primaryEmail = params.primaryEmail;
+          }
+          if (params.additionalEmails !== undefined) {
+            updateData.emails.additionalEmails = params.additionalEmails;
+          }
+        }
+
+        // Update phones if provided
+        if (params.primaryPhoneNumber !== undefined || params.additionalPhones !== undefined) {
+          updateData.phones = {};
+          if (params.primaryPhoneNumber !== undefined) {
+            updateData.phones.primaryPhoneNumber = params.primaryPhoneNumber;
+            if (params.primaryPhoneCountryCode) {
+              updateData.phones.primaryPhoneCountryCode = params.primaryPhoneCountryCode;
+            }
+            if (params.primaryPhoneCallingCode) {
+              updateData.phones.primaryPhoneCallingCode = params.primaryPhoneCallingCode;
+            }
+          }
+          if (params.additionalPhones !== undefined) {
+            updateData.phones.additionalPhones = params.additionalPhones;
+          }
+        }
+
+        // Update optional fields
+        if (params.companyId !== undefined) updateData.companyId = params.companyId;
+        if (params.jobTitle !== undefined) updateData.jobTitle = params.jobTitle;
+        if (params.city !== undefined) updateData.city = params.city;
+        if (params.avatarUrl !== undefined) updateData.avatarUrl = params.avatarUrl;
+        if (params.position !== undefined) updateData.position = params.position;
+        if (params.katgeorie !== undefined) updateData.katgeorie = params.katgeorie;
+
+        // Update LinkedIn link if provided
+        if (params.linkedinUrl !== undefined) {
+          updateData.linkedinLink = {
+            primaryLinkUrl: params.linkedinUrl,
+            primaryLinkLabel: params.linkedinLabel || 'LinkedIn'
           };
         }
 
-        const response = await client.updateOnePerson(id, data, 1);
-        const person = response.data.updatePerson;
+        // Update X/Twitter link if provided
+        if (params.xUrl !== undefined) {
+          updateData.xLink = {
+            primaryLinkUrl: params.xUrl,
+            primaryLinkLabel: params.xLabel || 'X'
+          };
+        }
 
+        const queryParams = new URLSearchParams();
+        if (params.depth !== undefined) {
+          queryParams.append('depth', params.depth.toString());
+        }
+        
+        const response = await client.makeRequest('PATCH', `/people/${params.id}?${queryParams.toString()}`, updateData);
+        
         return {
           content: [{
             type: 'text',
-            text: `Updated person: ${person.name?.firstName} ${person.name?.lastName || ''}`
+            text: JSON.stringify({
+              success: true,
+              person: response.data?.updatePerson || null,
+              message: 'Person updated successfully'
+            }, null, 2)
           }]
         };
+        
       } catch (error) {
         logger.error('Error updating person:', error);
         return {
           content: [{
             type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: `Error updating person: ${error instanceof Error ? error.message : 'Unknown error'}`
           }],
           isError: true
         };
@@ -264,33 +362,171 @@ export function registerPeopleTools(
     }
   );
 
-  // Delete person
+  // 5. Delete Person Tool
   server.registerTool(
     'delete-person',
     {
-
       description: 'Delete a person/contact from Twenty CRM',
       inputSchema: {
-        id: z.string().describe('Person ID to delete')
+        id: z.string().describe('UUID of the person to delete')
       }
     },
-    async (params, extra) => {
+    async ({ id }, extra) => {
       try {
-        const client = getClient(String(extra?.requestId || 'default'));
-        await client.deleteOnePerson(params.id);
-
+        const sessionId = String(extra?.requestId || 'default');
+        const client = getClient(sessionId);
+        
+        logger.info(`Deleting person ${id}`);
+        
+        const response = await client.makeRequest('DELETE', `/people/${id}`);
+        
         return {
           content: [{
             type: 'text',
-            text: `Successfully deleted person with ID: ${params.id}`
+            text: JSON.stringify({
+              success: true,
+              deletedId: response.data?.deletePerson?.id || id,
+              message: 'Person deleted successfully'
+            }, null, 2)
           }]
         };
+        
       } catch (error) {
         logger.error('Error deleting person:', error);
         return {
           content: [{
             type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: `Error deleting person: ${error instanceof Error ? error.message : 'Unknown error'}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // 6. Batch Create People Tool
+  server.registerTool(
+    'batch-create-people',
+    {
+      description: 'Create multiple people/contacts at once in Twenty CRM',
+      inputSchema: {
+        people: z.array(z.object({
+          firstName: z.string(),
+          lastName: z.string(),
+          primaryEmail: z.string().email().optional(),
+          primaryPhoneNumber: z.string().optional(),
+          companyId: z.string().optional(),
+          jobTitle: z.string().optional(),
+          city: z.string().optional(),
+          katgeorie: z.enum(['KUNDE', 'VERBÄNDE', 'PARTNER', 'DIENSTLEISTER']).optional()
+        })).describe('Array of people to create')
+      }
+    },
+    async ({ people }, extra) => {
+      try {
+        const sessionId = String(extra?.requestId || 'default');
+        const client = getClient(sessionId);
+        
+        logger.info(`Batch creating ${people.length} people`);
+        
+        const peopleData = people.map(person => ({
+          name: {
+            firstName: person.firstName,
+            lastName: person.lastName
+          },
+          ...(person.primaryEmail && {
+            emails: { primaryEmail: person.primaryEmail }
+          }),
+          ...(person.primaryPhoneNumber && {
+            phones: { primaryPhoneNumber: person.primaryPhoneNumber }
+          }),
+          ...(person.companyId && { companyId: person.companyId }),
+          ...(person.jobTitle && { jobTitle: person.jobTitle }),
+          ...(person.city && { city: person.city }),
+          ...(person.katgeorie && { katgeorie: person.katgeorie })
+        }));
+        
+        const response = await client.makeRequest('POST', '/batch/people', peopleData);
+        
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              people: response.data?.createPeople || [],
+              message: `${people.length} people created successfully`
+            }, null, 2)
+          }]
+        };
+        
+      } catch (error) {
+        logger.error('Error batch creating people:', error);
+        return {
+          content: [{
+            type: 'text',
+            text: `Error batch creating people: ${error instanceof Error ? error.message : 'Unknown error'}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // 7. Find People Duplicates Tool
+  server.registerTool(
+    'find-people-duplicates',
+    {
+      description: 'Find duplicate people in Twenty CRM based on provided data or IDs',
+      inputSchema: {
+        data: z.array(z.object({
+          firstName: z.string(),
+          lastName: z.string(),
+          primaryEmail: z.string().optional()
+        })).optional().describe('Array of people data to check for duplicates'),
+        ids: z.array(z.string()).optional().describe('Array of person IDs to check for duplicates')
+      }
+    },
+    async ({ data, ids }, extra) => {
+      try {
+        const sessionId = String(extra?.requestId || 'default');
+        const client = getClient(sessionId);
+        
+        logger.info(`Finding people duplicates`);
+        
+        const requestBody: any = {};
+        if (data) {
+          requestBody.data = data.map(person => ({
+            name: {
+              firstName: person.firstName,
+              lastName: person.lastName
+            },
+            ...(person.primaryEmail && {
+              emails: { primaryEmail: person.primaryEmail }
+            })
+          }));
+        }
+        if (ids) {
+          requestBody.ids = ids;
+        }
+        
+        const response = await client.makeRequest('POST', '/people/duplicates', requestBody);
+        
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              duplicates: response.data || [],
+              message: 'Duplicate search completed'
+            }, null, 2)
+          }]
+        };
+        
+      } catch (error) {
+        logger.error('Error finding people duplicates:', error);
+        return {
+          content: [{
+            type: 'text',
+            text: `Error finding people duplicates: ${error instanceof Error ? error.message : 'Unknown error'}`
           }],
           isError: true
         };
