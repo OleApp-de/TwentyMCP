@@ -11,9 +11,9 @@ export function registerNoteTargetTools(
 
   // 1. List NoteTargets Tool
   server.registerTool(
-    'list-note-targets',
+    'twenty-crm-list-note-targets',
     {
-      description: 'List and search note targets (note-entity relationships) in Twenty CRM',
+      description: 'Twenty CRM: List and search note targets (note-entity relationships) in Twenty CRM',
       inputSchema: {
         orderBy: z.string().optional().describe('Sort order (e.g. "createdAt", "noteId")'),
         filter: z.string().optional().describe('Filter criteria as JSON string (e.g. \'{"companyId":{"eq":"uuid"}}\''),
@@ -67,9 +67,9 @@ export function registerNoteTargetTools(
 
   // 2. Get NoteTarget Tool
   server.registerTool(
-    'get-note-target',
+    'twenty-crm-get-note-target',
     {
-      description: 'Get detailed information about a specific note target by ID',
+      description: 'Twenty CRM: Get detailed information about a specific note target by ID',
       inputSchema: {
         id: z.string().describe('UUID of the note target to retrieve'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)')
@@ -111,9 +111,9 @@ export function registerNoteTargetTools(
 
   // 3. Create NoteTarget Tool
   server.registerTool(
-    'create-note-target',
+    'twenty-crm-create-note-target',
     {
-      description: 'Create a new note target (link note to person, company, etc.) in Twenty CRM',
+      description: 'Twenty CRM: Create a new note target (link note to person, company, etc.) in Twenty CRM',
       inputSchema: {
         noteId: z.string().describe('UUID of the note to link'),
         personId: z.string().optional().describe('UUID of the person to link to'),
@@ -173,9 +173,9 @@ export function registerNoteTargetTools(
 
   // 4. Update NoteTarget Tool
   server.registerTool(
-    'update-note-target',
+    'twenty-crm-update-note-target',
     {
-      description: 'Update an existing note target in Twenty CRM',
+      description: 'Twenty CRM: Update an existing note target in Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the note target to update'),
         noteId: z.string().optional().describe('UUID of the note'),
@@ -235,9 +235,9 @@ export function registerNoteTargetTools(
 
   // 5. Delete NoteTarget Tool
   server.registerTool(
-    'delete-note-target',
+    'twenty-crm-delete-note-target',
     {
-      description: 'Delete a note target from Twenty CRM',
+      description: 'Twenty CRM: Delete a note target from Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the note target to delete')
       }
@@ -277,9 +277,9 @@ export function registerNoteTargetTools(
 
   // 6. Batch Create NoteTargets Tool
   server.registerTool(
-    'batch-create-note-targets',
+    'twenty-crm-batch-create-note-targets',
     {
-      description: 'Create multiple note targets at once in Twenty CRM',
+      description: 'Twenty CRM: Create multiple note targets at once in Twenty CRM',
       inputSchema: {
         noteTargets: z.array(z.object({
           noteId: z.string(),
@@ -338,9 +338,9 @@ export function registerNoteTargetTools(
 
   // 7. Get Notes for Company/Person Tool (Convenience)
   server.registerTool(
-    'get-notes-for-entity',
+    'twenty-crm-get-notes-for-entity',
     {
-      description: 'Get all notes linked to a specific company or person',
+      description: 'Twenty CRM: Get all notes linked to a specific company or person',
       inputSchema: {
         companyId: z.string().optional().describe('UUID of the company to get notes for'),
         personId: z.string().optional().describe('UUID of the person to get notes for'),

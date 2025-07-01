@@ -11,9 +11,9 @@ export function registerCompanyTools(
 
   // 1. List Companies Tool
   server.registerTool(
-    'list-companies',
+    'twenty-crm-list-companies',
     {
-      description: 'List and search companies/organizations in Twenty CRM with advanced filtering and pagination',
+      description: 'Twenty CRM: List and search companies/organizations in Twenty CRM with advanced filtering and pagination',
       inputSchema: {
         orderBy: z.string().optional().describe('Sort order (e.g. "createdAt", "name", "employees")'),
         filter: z.string().optional().describe('Filter criteria as JSON string (e.g. \'{"status":{"eq":"KUNDE"}}\')'),
@@ -67,9 +67,9 @@ export function registerCompanyTools(
 
   // 2. Get Company Tool
   server.registerTool(
-    'get-company',
+    'twenty-crm-get-company',
     {
-      description: 'Get detailed information about a specific company by ID',
+      description: 'Twenty CRM: Get detailed information about a specific company by ID',
       inputSchema: {
         id: z.string().describe('UUID of the company to retrieve'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)')
@@ -111,9 +111,9 @@ export function registerCompanyTools(
 
   // 3. Create Company Tool
   server.registerTool(
-    'create-company',
+    'twenty-crm-create-company',
     {
-      description: 'Create a new company/organization in Twenty CRM',
+      description: 'Twenty CRM: Create a new company/organization in Twenty CRM',
       inputSchema: {
         name: z.string().describe('Company name'),
         domainName: z.string().optional().describe('Company domain name'),
@@ -139,6 +139,8 @@ export function registerCompanyTools(
         accountOwnerId: z.string().optional().describe('UUID of the account owner'),
         status: z.enum(['INTERESSE', 'TRIAL', 'KUNDE', 'VERLOREN']).optional().describe('Company status'),
         unternehmenstyp: z.enum(['HANDWERKSUNTERNEHMEN', 'PARTNER', 'DIENSTLEISTER']).optional().describe('Company type'),
+        source: z.string().optional().describe('Source information (text field)'),
+        demoerstellung: z.string().optional().describe('Demo creation date and time in ISO 8601 format (e.g. "2025-06-30T18:40:51.452Z")'),
         createdBySource: z.enum(['EMAIL', 'CALENDAR', 'WORKFLOW', 'API', 'IMPORT', 'MANUAL', 'SYSTEM', 'WEBHOOK']).optional().describe('Source of creation')
       }
     },
@@ -182,6 +184,8 @@ export function registerCompanyTools(
         if (params.accountOwnerId) companyData.accountOwnerId = params.accountOwnerId;
         if (params.status) companyData.status = params.status;
         if (params.unternehmenstyp) companyData.unternehmenstyp = params.unternehmenstyp;
+        if (params.source) companyData.source = params.source;
+        if (params.demoerstellung) companyData.demoerstellung = params.demoerstellung;
 
         // Add LinkedIn link if provided
         if (params.linkedinUrl) {
@@ -242,9 +246,9 @@ export function registerCompanyTools(
 
   // 4. Update Company Tool
   server.registerTool(
-    'update-company',
+    'twenty-crm-update-company',
     {
-      description: 'Update an existing company/organization in Twenty CRM',
+      description: 'Twenty CRM: Update an existing company/organization in Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the company to update'),
         name: z.string().optional().describe('Company name'),
@@ -271,6 +275,8 @@ export function registerCompanyTools(
         accountOwnerId: z.string().nullable().optional().describe('UUID of the account owner (null to remove)'),
         status: z.enum(['INTERESSE', 'TRIAL', 'KUNDE', 'VERLOREN']).optional().describe('Company status'),
         unternehmenstyp: z.enum(['HANDWERKSUNTERNEHMEN', 'PARTNER', 'DIENSTLEISTER']).optional().describe('Company type'),
+        source: z.string().optional().describe('Source information (text field)'),
+        demoerstellung: z.string().optional().describe('Demo creation date and time in ISO 8601 format (e.g. "2025-06-30T18:40:51.452Z")'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include in response (0-3, default 1)')
       }
     },
@@ -318,6 +324,8 @@ export function registerCompanyTools(
         if (params.accountOwnerId !== undefined) updateData.accountOwnerId = params.accountOwnerId;
         if (params.status !== undefined) updateData.status = params.status;
         if (params.unternehmenstyp !== undefined) updateData.unternehmenstyp = params.unternehmenstyp;
+        if (params.source !== undefined) updateData.source = params.source;
+        if (params.demoerstellung !== undefined) updateData.demoerstellung = params.demoerstellung;
 
         // Update LinkedIn link if provided
         if (params.linkedinUrl !== undefined) {
@@ -376,9 +384,9 @@ export function registerCompanyTools(
 
   // 5. Delete Company Tool
   server.registerTool(
-    'delete-company',
+    'twenty-crm-delete-company',
     {
-      description: 'Delete a company/organization from Twenty CRM',
+      description: 'Twenty CRM: Delete a company/organization from Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the company to delete')
       }
@@ -418,9 +426,9 @@ export function registerCompanyTools(
 
   // 6. Batch Create Companies Tool
   server.registerTool(
-    'batch-create-companies',
+    'twenty-crm-batch-create-companies',
     {
-      description: 'Create multiple companies/organizations at once in Twenty CRM',
+      description: 'Twenty CRM: Create multiple companies/organizations at once in Twenty CRM',
       inputSchema: {
         companies: z.array(z.object({
           name: z.string(),
@@ -489,9 +497,9 @@ export function registerCompanyTools(
 
   // 7. Find Company Duplicates Tool
   server.registerTool(
-    'find-company-duplicates',
+    'twenty-crm-find-company-duplicates',
     {
-      description: 'Find duplicate companies in Twenty CRM based on provided data or IDs',
+      description: 'Twenty CRM: Find duplicate companies in Twenty CRM based on provided data or IDs',
       inputSchema: {
         data: z.array(z.object({
           name: z.string(),

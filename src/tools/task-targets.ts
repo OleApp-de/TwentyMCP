@@ -11,9 +11,9 @@ export function registerTaskTargetTools(
 
   // 1. List Task Targets Tool
   server.registerTool(
-    'list-task-targets',
+    'twenty-crm-list-task-targets',
     {
-      description: 'List task-target relationships (links between tasks and people/companies/opportunities)',
+      description: 'Twenty CRM: List task-target relationships (links between tasks and people/companies/opportunities)',
       inputSchema: {
         orderBy: z.string().optional().describe('Sort order (e.g. "createdAt", "taskId")'),
         filter: z.string().optional().describe('Filter criteria as JSON string (e.g. \'{"personId":{"eq":"uuid"}}\')'),
@@ -67,9 +67,9 @@ export function registerTaskTargetTools(
 
   // 2. Get Task Target Tool
   server.registerTool(
-    'get-task-target',
+    'twenty-crm-get-task-target',
     {
-      description: 'Get detailed information about a specific task target relationship by ID',
+      description: 'Twenty CRM: Get detailed information about a specific task target relationship by ID',
       inputSchema: {
         id: z.string().describe('UUID of the task target to retrieve'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)')
@@ -111,9 +111,9 @@ export function registerTaskTargetTools(
 
   // 3. Create Task Target Tool
   server.registerTool(
-    'create-task-target',
+    'twenty-crm-create-task-target',
     {
-      description: 'Create a task-target relationship (link a task to a person, company, or opportunity)',
+      description: 'Twenty CRM: Create a task-target relationship (link a task to a person, company, or opportunity)',
       inputSchema: {
         taskId: z.string().describe('UUID of the task'),
         personId: z.string().optional().describe('UUID of the person to link the task to'),
@@ -172,9 +172,9 @@ export function registerTaskTargetTools(
 
   // 4. Update Task Target Tool
   server.registerTool(
-    'update-task-target',
+    'twenty-crm-update-task-target',
     {
-      description: 'Update an existing task-target relationship',
+      description: 'Twenty CRM: Update an existing task-target relationship',
       inputSchema: {
         id: z.string().describe('UUID of the task target to update'),
         taskId: z.string().optional().describe('UUID of the task'),
@@ -234,9 +234,9 @@ export function registerTaskTargetTools(
 
   // 5. Delete Task Target Tool
   server.registerTool(
-    'delete-task-target',
+    'twenty-crm-delete-task-target',
     {
-      description: 'Delete a task-target relationship',
+      description: 'Twenty CRM: Delete a task-target relationship',
       inputSchema: {
         id: z.string().describe('UUID of the task target to delete')
       }
@@ -276,9 +276,9 @@ export function registerTaskTargetTools(
 
   // 6. Link Task to Person Tool (Convenience function)
   server.registerTool(
-    'link-task-to-person',
+    'twenty-crm-link-task-to-person',
     {
-      description: 'Link a task to a person (convenience function for creating task-person relationship)',
+      description: 'Twenty CRM: Link a task to a person (convenience function for creating task-person relationship)',
       inputSchema: {
         taskId: z.string().describe('UUID of the task'),
         personId: z.string().describe('UUID of the person')
@@ -324,9 +324,9 @@ export function registerTaskTargetTools(
 
   // 7. Link Task to Company Tool (Convenience function)
   server.registerTool(
-    'link-task-to-company',
+    'twenty-crm-link-task-to-company',
     {
-      description: 'Link a task to a company (convenience function for creating task-company relationship)',
+      description: 'Twenty CRM: Link a task to a company (convenience function for creating task-company relationship)',
       inputSchema: {
         taskId: z.string().describe('UUID of the task'),
         companyId: z.string().describe('UUID of the company')
@@ -372,9 +372,9 @@ export function registerTaskTargetTools(
 
   // 8. Get Tasks for Person Tool (Convenience function)
   server.registerTool(
-    'get-tasks-for-person',
+    'twenty-crm-get-tasks-for-person',
     {
-      description: 'Get all tasks linked to a specific person',
+      description: 'Twenty CRM: Get all tasks linked to a specific person',
       inputSchema: {
         personId: z.string().describe('UUID of the person'),
         status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional().describe('Filter by task status'),
@@ -434,9 +434,9 @@ export function registerTaskTargetTools(
 
   // 9. Get Tasks for Company Tool (Convenience function)
   server.registerTool(
-    'get-tasks-for-company',
+    'twenty-crm-get-tasks-for-company',
     {
-      description: 'Get all tasks linked to a specific company',
+      description: 'Twenty CRM: Get all tasks linked to a specific company',
       inputSchema: {
         companyId: z.string().describe('UUID of the company'),
         status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional().describe('Filter by task status'),

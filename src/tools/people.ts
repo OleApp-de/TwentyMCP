@@ -11,9 +11,9 @@ export function registerPeopleTools(
 
   // 1. List People Tool
   server.registerTool(
-    'list-people',
+    'twenty-crm-list-people',
     {
-      description: 'List and search people/contacts in Twenty CRM with advanced filtering and pagination',
+      description: 'Twenty CRM: List and search people/contacts in Twenty CRM with advanced filtering and pagination',
       inputSchema: {
         orderBy: z.string().optional().describe('Sort order (e.g. "createdAt", "name.lastName", "name.firstName")'),
         filter: z.string().optional().describe('Filter criteria as JSON string (e.g. \'{"katgeorie":{"eq":"KUNDE"}}\')'),
@@ -67,9 +67,9 @@ export function registerPeopleTools(
 
   // 2. Get Person Tool
   server.registerTool(
-    'get-person',
+    'twenty-crm-get-person',
     {
-      description: 'Get detailed information about a specific person by ID',
+      description: 'Twenty CRM: Get detailed information about a specific person by ID',
       inputSchema: {
         id: z.string().describe('UUID of the person to retrieve'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)')
@@ -111,9 +111,9 @@ export function registerPeopleTools(
 
   // 3. Create Person Tool
   server.registerTool(
-    'create-person',
+    'twenty-crm-create-person',
     {
-      description: 'Create a new person/contact in Twenty CRM',
+      description: 'Twenty CRM: Create a new person/contact in Twenty CRM',
       inputSchema: {
         firstName: z.string().describe('First name of the person'),
         lastName: z.string().describe('Last name of the person'),
@@ -238,9 +238,9 @@ export function registerPeopleTools(
 
   // 4. Update Person Tool
   server.registerTool(
-    'update-person',
+    'twenty-crm-update-person',
     {
-      description: 'Update an existing person/contact in Twenty CRM',
+      description: 'Twenty CRM: Update an existing person/contact in Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the person to update'),
         firstName: z.string().optional().describe('First name of the person'),
@@ -365,9 +365,9 @@ export function registerPeopleTools(
 
   // 5. Delete Person Tool
   server.registerTool(
-    'delete-person',
+    'twenty-crm-delete-person',
     {
-      description: 'Delete a person/contact from Twenty CRM',
+      description: 'Twenty CRM: Delete a person/contact from Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the person to delete')
       }
@@ -407,9 +407,9 @@ export function registerPeopleTools(
 
   // 6. Batch Create People Tool
   server.registerTool(
-    'batch-create-people',
+    'twenty-crm-batch-create-people',
     {
-      description: 'Create multiple people/contacts at once in Twenty CRM',
+      description: 'Twenty CRM: Create multiple people/contacts at once in Twenty CRM',
       inputSchema: {
         people: z.array(z.object({
           firstName: z.string(),
@@ -475,9 +475,9 @@ export function registerPeopleTools(
 
   // 7. Find People Duplicates Tool
   server.registerTool(
-    'find-people-duplicates',
+    'twenty-crm-find-people-duplicates',
     {
-      description: 'Find duplicate people in Twenty CRM based on provided data or IDs',
+      description: 'Twenty CRM: Find duplicate people in Twenty CRM based on provided data or IDs',
       inputSchema: {
         data: z.array(z.object({
           firstName: z.string(),

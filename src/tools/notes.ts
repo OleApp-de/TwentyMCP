@@ -11,9 +11,9 @@ export function registerNotesTools(
 
   // 1. List Notes Tool
   server.registerTool(
-    'list-notes',
+    'twenty-crm-list-notes',
     {
-      description: 'List and search notes in Twenty CRM with advanced filtering and pagination',
+      description: 'Twenty CRM: List and search notes in Twenty CRM with advanced filtering and pagination',
       inputSchema: {
         orderBy: z.string().optional().describe('Sort order (e.g. "createdAt", "title", "updatedAt")'),
         filter: z.string().optional().describe('Filter criteria as JSON string (e.g. \'{"title":{"ilike":"*demo*"}}\''),
@@ -67,9 +67,9 @@ export function registerNotesTools(
 
   // 2. Get Note Tool
   server.registerTool(
-    'get-note',
+    'twenty-crm-get-note',
     {
-      description: 'Get detailed information about a specific note by ID',
+      description: 'Twenty CRM: Get detailed information about a specific note by ID',
       inputSchema: {
         id: z.string().describe('UUID of the note to retrieve'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)')
@@ -111,9 +111,9 @@ export function registerNotesTools(
 
   // 3. Create Note Tool
   server.registerTool(
-    'create-note',
+    'twenty-crm-create-note',
     {
-      description: 'Create a new note in Twenty CRM',
+      description: 'Twenty CRM: Create a new note in Twenty CRM',
       inputSchema: {
         title: z.string().optional().describe('Note title (optional)'),
         content: z.string().optional().describe('Note content/text (will be converted to markdown format automatically)'),
@@ -243,9 +243,9 @@ export function registerNotesTools(
 
   // 4. Update Note Tool
   server.registerTool(
-    'update-note',
+    'twenty-crm-update-note',
     {
-      description: 'Update an existing note in Twenty CRM',
+      description: 'Twenty CRM: Update an existing note in Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the note to update'),
         title: z.string().optional().describe('Note title'),
@@ -308,9 +308,9 @@ export function registerNotesTools(
 
   // 5. Delete Note Tool
   server.registerTool(
-    'delete-note',
+    'twenty-crm-delete-note',
     {
-      description: 'Delete a note from Twenty CRM',
+      description: 'Twenty CRM: Delete a note from Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the note to delete')
       }
@@ -350,9 +350,9 @@ export function registerNotesTools(
 
   // 6. Batch Create Notes Tool
   server.registerTool(
-    'batch-create-notes',
+    'twenty-crm-batch-create-notes',
     {
-      description: 'Create multiple notes at once in Twenty CRM',
+      description: 'Twenty CRM: Create multiple notes at once in Twenty CRM',
       inputSchema: {
         notes: z.array(z.object({
           title: z.string(),
@@ -412,9 +412,9 @@ export function registerNotesTools(
 
   // 7. Find Note Duplicates Tool
   server.registerTool(
-    'find-note-duplicates',
+    'twenty-crm-find-note-duplicates',
     {
-      description: 'Find duplicate notes in Twenty CRM based on provided data or IDs',
+      description: 'Twenty CRM: Find duplicate notes in Twenty CRM based on provided data or IDs',
       inputSchema: {
         data: z.array(z.object({
           title: z.string(),

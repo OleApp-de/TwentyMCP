@@ -32,6 +32,12 @@ https://crm.tools.ole.de/rest/
 ## Authentication
 Bearer Token im Authorization Header erforderlich.
 
+## PostgreSQL User Management (Optional)
+Für die Benutzerverwaltung kann optional eine PostgreSQL-Verbindung konfiguriert werden:
+- Environment Variable: POSTGRES_CONNECTION_STRING
+- Format: postgresql://user:password@host:port/database
+- Aktiviert 11 zusätzliche Tools für Better Auth Benutzerverwaltung
+
 ---
 
 ## Personen (People) API
@@ -167,7 +173,9 @@ POST /people
   "idealCustomerProfile": "boolean",
   "accountOwnerId": "uuid",
   "status": "INTERESSE|TRIAL|KUNDE|VERLOREN",
-  "unternehmenstyp": "HANDWERKSUNTERNEHMEN|PARTNER|DIENSTLEISTER"
+  "unternehmenstyp": "HANDWERKSUNTERNEHMEN|PARTNER|DIENSTLEISTER",
+  "source": "string",
+  "demoerstellung": "date-time"
 }
 \`\`\`
 
@@ -370,7 +378,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
         uri: "twenty://available-tools",
         text: `# Verfügbare Twenty CRM MCP Tools
 
-## 🏢 Company Management
+## 🏢 Twenty CRM: Company Management
 - **create-company** - Neues Unternehmen erstellen
 - **get-company** - Unternehmen abrufen
 - **list-companies** - Unternehmen auflisten/suchen
@@ -379,7 +387,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **batch-create-companies** - Mehrere Unternehmen erstellen
 - **find-company-duplicates** - Duplikate finden
 
-## 👥 People Management  
+## 👥 Twenty CRM: People Management  
 - **create-person** - Neue Person erstellen
 - **get-person** - Person abrufen
 - **list-people** - Personen auflisten/suchen
@@ -388,7 +396,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **batch-create-people** - Mehrere Personen erstellen
 - **find-people-duplicates** - Duplikate finden
 
-## ✅ Task Management
+## ✅ Twenty CRM: Task Management
 - **create-task** - Neue Aufgabe erstellen (MIT automatischen Verknüpfungsparametern linkToCompanyId/linkToPersonId)
 - **get-task** - Aufgabe abrufen
 - **list-tasks** - Aufgaben auflisten/suchen
@@ -398,7 +406,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **batch-create-tasks** - Mehrere Aufgaben erstellen
 - **find-task-duplicates** - Duplikate finden
 
-## 🔗 Task Target Management
+## 🔗 Twenty CRM: Task Target Management
 - **create-task-target** - Aufgaben-Verknüpfung erstellen
 - **get-task-target** - Verknüpfung abrufen
 - **list-task-targets** - Verknüpfungen auflisten
@@ -409,7 +417,7 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **get-tasks-for-company** - Alle Aufgaben eines Unternehmens
 - **get-tasks-for-person** - Alle Aufgaben einer Person
 
-## 📝 Notes Management
+## 📝 Twenty CRM: Notes Management
 - **create-note** - Neue Notiz erstellen (MIT automatischen Verknüpfungsparametern linkToCompanyId/linkToPersonId)
 - **get-note** - Notiz abrufen
 - **list-notes** - Notizen auflisten/suchen
@@ -418,13 +426,26 @@ BASE URL: https://crm.tools.ole.de/rest/`
 - **batch-create-notes** - Mehrere Notizen erstellen
 - **find-note-duplicates** - Duplikate finden
 
-## 🔗 Note Target Management
+## 🔗 Twenty CRM: Note Target Management
 - **create-note-target** - Notiz-Verknüpfung erstellen
 - **get-note-target** - Verknüpfung abrufen
 - **list-note-targets** - Verknüpfungen auflisten
 - **update-note-target** - Verknüpfung aktualisieren
 - **delete-note-target** - Verknüpfung löschen
 - **get-notes-for-entity** - Alle Notizen für Unternehmen/Person abrufen
+
+## 👥 Ole-App Usermanagement (PostgreSQL)
+- **list-organizations** - Alle Organisationen auflisten
+- **get-organization** - Organisation abrufen
+- **create-organization** - Neue Organisation erstellen
+- **update-organization** - Organisation aktualisieren
+- **delete-organization** - Organisation löschen (mit allen Benutzern)
+- **list-users** - Benutzer einer Organisation auflisten
+- **get-user** - Benutzer abrufen
+- **create-user** - Neuen Benutzer erstellen
+- **update-user** - Benutzer aktualisieren
+- **delete-user** - Benutzer löschen
+- **export-users-sql** - SQL-Export für Benutzer
 
 ## 🖥️ System Tools
 - **get-server-info** - Server-Informationen

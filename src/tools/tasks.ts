@@ -11,9 +11,9 @@ export function registerTaskTools(
 
   // 1. List Tasks Tool
   server.registerTool(
-    'list-tasks',
+    'twenty-crm-list-tasks',
     {
-      description: 'List and search tasks in Twenty CRM with advanced filtering and pagination',
+      description: 'Twenty CRM: List and search tasks in Twenty CRM with advanced filtering and pagination',
       inputSchema: {
         orderBy: z.string().optional().describe('Sort order (e.g. "createdAt", "dueAt", "status", "title")'),
         filter: z.string().optional().describe('Filter criteria as JSON string (e.g. \'{"status":{"eq":"TODO"}}\')'),
@@ -67,9 +67,9 @@ export function registerTaskTools(
 
   // 2. Get Task Tool
   server.registerTool(
-    'get-task',
+    'twenty-crm-get-task',
     {
-      description: 'Get detailed information about a specific task by ID',
+      description: 'Twenty CRM: Get detailed information about a specific task by ID',
       inputSchema: {
         id: z.string().describe('UUID of the task to retrieve'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include (0-3, default 1)')
@@ -111,9 +111,9 @@ export function registerTaskTools(
 
   // 3. Create Task Tool
   server.registerTool(
-    'create-task',
+    'twenty-crm-create-task',
     {
-      description: 'Create a new task in Twenty CRM',
+      description: 'Twenty CRM: Create a new task in Twenty CRM',
       inputSchema: {
         title: z.string().describe('Task title'),
         content: z.string().optional().describe('Task content/description (will be converted to markdown format automatically)'),
@@ -250,9 +250,9 @@ export function registerTaskTools(
 
   // 4. Update Task Tool
   server.registerTool(
-    'update-task',
+    'twenty-crm-update-task',
     {
-      description: 'Update an existing task in Twenty CRM',
+      description: 'Twenty CRM: Update an existing task in Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the task to update'),
         title: z.string().optional().describe('Task title'),
@@ -321,9 +321,9 @@ export function registerTaskTools(
 
   // 5. Delete Task Tool
   server.registerTool(
-    'delete-task',
+    'twenty-crm-delete-task',
     {
-      description: 'Delete a task from Twenty CRM',
+      description: 'Twenty CRM: Delete a task from Twenty CRM',
       inputSchema: {
         id: z.string().describe('UUID of the task to delete')
       }
@@ -363,9 +363,9 @@ export function registerTaskTools(
 
   // 6. Batch Create Tasks Tool
   server.registerTool(
-    'batch-create-tasks',
+    'twenty-crm-batch-create-tasks',
     {
-      description: 'Create multiple tasks at once in Twenty CRM',
+      description: 'Twenty CRM: Create multiple tasks at once in Twenty CRM',
       inputSchema: {
         tasks: z.array(z.object({
           title: z.string(),
@@ -427,9 +427,9 @@ export function registerTaskTools(
 
   // 7. Find Task Duplicates Tool
   server.registerTool(
-    'find-task-duplicates',
+    'twenty-crm-find-task-duplicates',
     {
-      description: 'Find duplicate tasks in Twenty CRM based on provided data or IDs',
+      description: 'Twenty CRM: Find duplicate tasks in Twenty CRM based on provided data or IDs',
       inputSchema: {
         data: z.array(z.object({
           title: z.string(),
@@ -483,9 +483,9 @@ export function registerTaskTools(
 
   // 8. Complete Task Tool (Convenience function)
   server.registerTool(
-    'complete-task',
+    'twenty-crm-complete-task',
     {
-      description: 'Mark a task as completed (convenience function that sets status to DONE)',
+      description: 'Twenty CRM: Mark a task as completed (convenience function that sets status to DONE)',
       inputSchema: {
         id: z.string().describe('UUID of the task to complete'),
         depth: z.number().min(0).max(3).optional().describe('Depth of related data to include in response (0-3, default 1)')

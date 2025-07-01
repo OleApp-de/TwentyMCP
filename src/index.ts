@@ -11,16 +11,20 @@ import winston from 'winston';
 import cors from 'cors';
 
 import { TwentyCRMClient } from './twenty-client.js';
+import { PostgresClient } from './postgres-client.js';
 import { registerPeopleTools } from './tools/people.js';
 import { registerCompanyTools } from './tools/companies.js';
 import { registerTaskTools } from './tools/tasks.js';
 import { registerTaskTargetTools } from './tools/task-targets.js';
 import { registerNotesTools } from './tools/notes.js';
 import { registerNoteTargetTools } from './tools/note-targets.js';
+import { registerUserManagementTools } from './tools/user-management.js';
 import { setupPromptHandlers } from './handlers.js';
 import { ApiKeyOAuthProvider, createOAuthMiddleware } from './auth/api-key-oauth-provider.js';
 import { createApiKeyOAuthRouter } from './auth/api-key-oauth-router.js';
 
+// Load environment variables from .env.local and .env files
+dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 // Transport type
@@ -54,6 +58,20 @@ let globalAuthenticatedClient: TwentyCRMClient | null = null;
 // Request-scoped authentication for streamable-http
 let currentRequestClient: TwentyCRMClient | null = null;
 
+// Initialize PostgreSQL client
+let postgresClient: PostgresClient | null = null;
+if (process.env.POSTGRES_CONNECTION_STRING) {
+  postgresClient = new PostgresClient(process.env.POSTGRES_CONNECTION_STRING, logger);
+}
+
+// Helper to get PostgreSQL client (global function)
+const getPostgresClient = (): PostgresClient => {
+  if (!postgresClient) {
+    throw new Error('PostgreSQL not configured. Please set POSTGRES_CONNECTION_STRING environment variable.');
+  }
+  return postgresClient;
+};
+
 // Create and configure MCP server
 const createServer = (authenticatedClient?: TwentyCRMClient) => {
   const server = new McpServer({
@@ -81,7 +99,7 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
           name: 'twenty-crm-mcp',
           version: '1.0.0',
           transport,
-          capabilities: ['people', 'companies', 'tasks', 'task-targets', 'notes', 'note-targets', 'prompts', 'resources'],
+          capabilities: ['people', 'companies', 'tasks', 'task-targets', 'notes', 'note-targets', 'user-management', 'prompts', 'resources'],
           multiUser: true,
           requiresAuthentication: true,
           authMethods: ['api-key-tool', 'oauth-bearer'],
@@ -96,7 +114,6 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
       }]
     })
   );
-
 
   // Helper to get client
   const getClient = (sessionId: string = 'default'): TwentyCRMClient => {
@@ -149,6 +166,11 @@ const createServer = (authenticatedClient?: TwentyCRMClient) => {
   registerTaskTargetTools(server, getClient, logger);
   registerNotesTools(server, getClient, logger);
   registerNoteTargetTools(server, getClient, logger);
+  
+  // Register PostgreSQL user management tools if configured
+  if (postgresClient) {
+    registerUserManagementTools(server, getPostgresClient, logger);
+  }
 
   // Register prompt and resource handlers
   setupPromptHandlers(server);
@@ -161,6 +183,18 @@ const MCP_PORT = parseInt(process.env.PORT || '3000');
 // Main function based on transport
 async function main() {
   logger.info(`Starting Twenty CRM MCP Server with ${transport} transport`);
+  
+  // Connect to PostgreSQL if configured
+  if (postgresClient) {
+    try {
+      await postgresClient.connect();
+      logger.info('PostgreSQL user management features enabled');
+    } catch (error) {
+      logger.error('Failed to connect to PostgreSQL:', error);
+      logger.info('User management features will be disabled');
+      postgresClient = null;
+    }
+  }
 
   if (transport === 'stdio') {
     // STDIO transport
