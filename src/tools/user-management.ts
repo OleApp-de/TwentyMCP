@@ -687,7 +687,7 @@ export function registerUserManagementTools(
       description: 'Ole-App Usermanagement: Send invitation email with login credentials via MailerSend',
       inputSchema: {
         recipientEmail: z.string().email().describe('Email address of the recipient'),
-        recipientName: z.string().describe('Name of the recipient (will be used in email template)'),
+        recipientName: z.string().describe('First name only of the recipient (will be used in email template personalization)'),
         password: z.string().describe('Password to include in the invitation email'),
         bccEmail: z.string().email().optional().describe('Optional BCC email address to receive a copy of the invitation')
       }
