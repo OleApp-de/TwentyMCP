@@ -19,7 +19,8 @@ async function sendInvitationEmail(
   recipientEmail: string, 
   recipientName: string, 
   password: string,
-  logger: Logger
+  logger: Logger,
+  bccEmail?: string
 ): Promise<any> {
   const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
   const TEMPLATE_ID = 'o65qngkv76jlwr12';
@@ -29,7 +30,7 @@ async function sendInvitationEmail(
     throw new Error('MAILERSEND_API_KEY not configured');
   }
 
-  const payload = {
+  const payload: any = {
     from: {
       email: FROM_EMAIL
     },
@@ -50,6 +51,15 @@ async function sendInvitationEmail(
     ],
     template_id: TEMPLATE_ID
   };
+
+  // Add BCC if provided
+  if (bccEmail) {
+    payload.bcc = [
+      {
+        email: bccEmail
+      }
+    ];
+  }
 
   try {
     const response = await axios.post(
@@ -678,10 +688,11 @@ export function registerUserManagementTools(
       inputSchema: {
         recipientEmail: z.string().email().describe('Email address of the recipient'),
         recipientName: z.string().describe('Name of the recipient (will be used in email template)'),
-        password: z.string().describe('Password to include in the invitation email')
+        password: z.string().describe('Password to include in the invitation email'),
+        bccEmail: z.string().email().optional().describe('Optional BCC email address to receive a copy of the invitation')
       }
     },
-    async ({ recipientEmail, recipientName, password }, extra) => {
+    async ({ recipientEmail, recipientName, password, bccEmail }, extra) => {
       try {
         logger.info(`Sending invitation email to ${recipientEmail}`);
         
@@ -689,26 +700,34 @@ export function registerUserManagementTools(
           recipientEmail,
           recipientName,
           password,
-          logger
+          logger,
+          bccEmail
         );
         
+        const response: any = {
+          success: true,
+          emailResult,
+          recipient: {
+            email: recipientEmail,
+            name: recipientName
+          },
+          templateData: {
+            name: recipientName,
+            Passwort: password,
+            Benutzername: recipientEmail
+          },
+          message: 'Invitation email sent successfully'
+        };
+
+        // Add BCC to response if it was used
+        if (bccEmail) {
+          response.bcc = bccEmail;
+        }
+
         return {
           content: [{
             type: 'text',
-            text: JSON.stringify({
-              success: true,
-              emailResult,
-              recipient: {
-                email: recipientEmail,
-                name: recipientName
-              },
-              templateData: {
-                name: recipientName,
-                Passwort: password,
-                Benutzername: recipientEmail
-              },
-              message: 'Invitation email sent successfully'
-            }, null, 2)
+            text: JSON.stringify(response, null, 2)
           }]
         };
         
